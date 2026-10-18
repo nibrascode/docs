@@ -1134,8 +1134,8 @@ class _VisualTableState extends State<_VisualTable> {
       for (var r = 0; r < newR; r++) {
         for (var c = 0; c < newC && c < _ctrls[r].length; c++) {
           if (!_nodes[r][c].hasFocus &&
-              _enc(_ctrls[r][c]) != widget.cells[r][c]) {
-            _ctrls[r][c].setLines(RichDoc.decode(widget.cells[r][c]));
+              _enc(_ctrls[r][c]) != _txt(r, c)) {
+            _ctrls[r][c].setLines(RichDoc.decode(_txt(r, c)));
           }
         }
       }
@@ -1151,7 +1151,7 @@ class _VisualTableState extends State<_VisualTable> {
     });
     _ctrls = List.generate(widget.cells.length, (r) {
       return List.generate(widget.cells[r].length, (c) {
-        final ctrl = RichController(lines: RichDoc.decode(widget.cells[r][c]));
+        final ctrl = RichController(lines: RichDoc.decode(_txt(r, c)));
         // Formatting from the toolbar changes the controller without an
         // onChanged; push those changes to the document too.
         ctrl.addListener(() {
@@ -1159,7 +1159,7 @@ class _VisualTableState extends State<_VisualTable> {
           if (t.contains('\n') || t.contains('\t')) return; // onChanged handles
           if (r >= widget.cells.length || c >= widget.cells[r].length) return;
           final e = _enc(ctrl);
-          if (e != widget.cells[r][c]) widget.onCellChanged(r, c, e);
+          if (e != _txt(r, c)) _set(r, c, e);
         });
         return ctrl;
       });
@@ -1239,7 +1239,7 @@ class _VisualTableState extends State<_VisualTable> {
     }
     if (_selR < _ctrls.length && _selC < _ctrls[_selR].length) {
       _ctrls[_selR][_selC].setLines(RichDoc.decode(raw.replaceAll('\n', ' ')));
-      widget.onCellChanged(_selR, _selC, _enc(_ctrls[_selR][_selC]));
+      _set(_selR, _selC, _enc(_ctrls[_selR][_selC]));
     }
   }
 
@@ -1262,6 +1262,156 @@ class _VisualTableState extends State<_VisualTable> {
     Clipboard.setData(
       ClipboardData(text: widget.cells[_selR].join('\t')),
     );
+  }
+
+  String _txt(int r, int c) =>
+      c < widget.cells[r].length ? CellAttr.parse(widget.cells[r][c]).$3 : '';
+
+  /// Writes cell text keeping its colour / merge attributes.
+  void _set(int r, int c, String text) {
+    final (bg, span, _) = CellAttr.parse(widget.cells[r][c]);
+    widget.onCellChanged(r, c, CellAttr.make(bg, span, text));
+  }
+
+  Widget _cell(int r, int c, int span, bool head, List<double> colW, double fs,
+      double pad, Color ink, BorderSide grid) {
+    final (bg, _, _) = CellAttr.parse(widget.cells[r][c]);
+    final w = colW.sublist(c, c + span).fold(0.0, (a, v) => a + v);
+    final selected = r == _selR && c == _selC && _nodes[r][c].hasFocus;
+    final ts = widget.style.copyWith(
+      fontSize: fs,
+      height: TableSpec.lineScale,
+      fontWeight: head ? FontWeight.w700 : FontWeight.w400,
+      color: ink,
+    );
+    final a = TableSpec.align(widget.aligns, c);
+    return SizedBox(
+      key: ValueKey('cell-$r-$c'),
+      width: w,
+      child: GestureDetector(
+        onLongPress: widget.readOnly ? null : _openTableMenu,
+        child: Stack(
+          fit: StackFit.passthrough,
+          children: [
+            Container(
+              color: Color(bg ?? (head ? TableSpec.headerFill : 0x00000000)),
+              padding: EdgeInsets.all(pad),
+              child: TextField(
+                controller: _ctrls[r][c],
+                focusNode: _nodes[r][c],
+                readOnly: widget.readOnly,
+                maxLines: null,
+                keyboardType: TextInputType.text,
+                textInputAction: TextInputAction.next,
+                textAlign: switch (a) {
+                  'center' => TextAlign.center,
+                  'right' => TextAlign.right,
+                  _ => TextAlign.start,
+                },
+                style: ts,
+                strutStyle: StrutStyle(fontSize: fs, height: TableSpec.lineScale, forceStrutHeight: true),
+                decoration: const InputDecoration.collapsed(hintText: ''),
+                onTap: () {
+                  widget.onActive(_ctrls[r][c]);
+                  setState(() {
+                    _selR = r;
+                    _selC = c;
+                  });
+                },
+                onChanged: (_) {
+                  final ctrl = _ctrls[r][c];
+                  final v = ctrl.text;
+                  final g = TableBlock.parseClipboardGrid(v);
+                  if (g != null && (v.contains('\t') || v.contains('\n')) && (g.length > 1 || g.first.length > 1)) {
+                    ctrl.setLines(RichDoc.decode(_txt(r, c)));
+                    widget.onPasteGrid(r, c, g);
+                    return;
+                  }
+                  if (v.contains('\n')) {
+                    // Enter in a cell = next cell (cells are one paragraph).
+                    ctrl.setLines(RichDoc.decode(_enc(ctrl).replaceAll('\n', ' ').trimRight()));
+                    _set(r, c, _enc(ctrl));
+                    _move(0, 1);
+                    return;
+                  }
+                  _set(r, c, _enc(ctrl));
+                },
+                onEditingComplete: () => _move(0, 1),
+              ),
+            ),
+            // Grid lines / selection: drawn on top, never change the layout.
+            Positioned.fill(
+              child: IgnorePointer(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    border: selected && !widget.readOnly
+                        ? Border.all(color: const Color(0xFFC9A84C), width: 1.6)
+                        : Border(top: grid, left: grid, right: grid, bottom: grid),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _mergeRight() {
+    final row = widget.cells[_selR];
+    final cols = row.length;
+    final (bg, span, text) = CellAttr.parse(row[_selC]);
+    final next = _selC + span;
+    if (next >= cols) return;
+    final (_, nspan, ntext) = CellAttr.parse(row[next]);
+    final joined = [text, ntext].where((e) => e.trim().isNotEmpty).join(' ');
+    for (var c = next; c < next + nspan && c < cols; c++) {
+      widget.onCellChanged(_selR, c, '');
+      _ctrls[_selR][c].setLines(RichDoc.decode(''));
+    }
+    widget.onCellChanged(_selR, _selC, CellAttr.make(bg, span + nspan, joined));
+    _ctrls[_selR][_selC].setLines(RichDoc.decode(joined));
+    setState(() {});
+  }
+
+  void _unmerge() {
+    final (bg, _, text) = CellAttr.parse(widget.cells[_selR][_selC]);
+    widget.onCellChanged(_selR, _selC, CellAttr.make(bg, 1, text));
+    setState(() {});
+  }
+
+  Future<void> _cellColour() async {
+    const colors = [0, 0xFFF1ECE0, 0xFFFDE2E1, 0xFFE3F2E1, 0xFFE1ECFB, 0xFFFFF4CC, 0xFFEDE3F7, 0xFFE0E0E0];
+    final picked = await showModalBottomSheet<int>(
+      context: context,
+      backgroundColor: Colors.white,
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Wrap(spacing: 12, runSpacing: 12, children: [
+            for (final c in colors)
+              GestureDetector(
+                key: ValueKey('cell-colour-$c'),
+                onTap: () => Navigator.pop(ctx, c),
+                child: Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: Color(c == 0 ? 0xFFFFFFFF : c),
+                    shape: BoxShape.circle,
+                    border: Border.all(color: const Color(0xFFD0D5DD)),
+                  ),
+                  child: c == 0 ? const Icon(Icons.block, size: 18) : null,
+                ),
+              ),
+          ]),
+        ),
+      ),
+    );
+    if (picked == null) return;
+    final (_, span, text) = CellAttr.parse(widget.cells[_selR][_selC]);
+    widget.onCellChanged(_selR, _selC, CellAttr.make(picked == 0 ? null : picked, span, text));
+    setState(() {});
   }
 
   Future<void> _openTableMenu() async {
@@ -1343,6 +1493,10 @@ class _VisualTableState extends State<_VisualTable> {
                     ),
                   ],
                 ),
+                _menuItem(ctx, Icons.call_merge, l10n.t(az: 'Sağdakı xana ilə birləşdir', en: 'Merge with right cell', ru: 'Объединить с правой', ar: 'دمج مع الخلية اليمنى'), _mergeRight),
+                if (CellAttr.parse(widget.cells[_selR.clamp(0, widget.cells.length - 1)][_selC.clamp(0, widget.cells.first.length - 1)]).$2 > 1)
+                  _menuItem(ctx, Icons.call_split, l10n.t(az: 'Birləşməni ayır', en: 'Unmerge', ru: 'Разъединить', ar: 'إلغاء الدمج'), _unmerge),
+                _menuItem(ctx, Icons.format_color_fill, l10n.t(az: 'Xana rəngi', en: 'Cell colour', ru: 'Цвет ячейки', ar: 'لون الخلية'), _cellColour),
                 _menuItem(ctx, Icons.table_rows_outlined, widget.header
                     ? l10n.t(az: 'Başlıq sətrini söndür', en: 'Turn off header row', ru: 'Без строки заголовка', ar: 'إلغاء صف العنوان')
                     : l10n.t(az: 'Başlıq sətri', en: 'Header row', ru: 'Строка заголовка', ar: 'صف العنوان'), widget.onToggleHeader),
@@ -1431,102 +1585,50 @@ class _VisualTableState extends State<_VisualTable> {
                 final fs = (widget.style.fontSize ?? 14) * TableSpec.fontScale;
                 final pad = TableSpec.pad * k;
                 final ink = widget.style.color ?? const Color(0xFF1A1A1A);
+                final grid = BorderSide(
+                  color: const Color(TableSpec.borderColor),
+                  width: TableSpec.borderWidth * k,
+                );
                 return SizedBox(
                   width: avail,
-                  child: Table(
+                  child: Column(
                     key: const ValueKey('visual-table'),
-                    border: TableBorder.all(
-                      color: const Color(TableSpec.borderColor),
-                      width: TableSpec.borderWidth * k,
-                    ),
-                    defaultVerticalAlignment: TableCellVerticalAlignment.top,
-                    columnWidths: {
-                      for (var c = 0; c < cols; c++) c: FixedColumnWidth(colW[c]),
-                    },
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: List.generate(widget.cells.length, (r) {
                       final head = r == 0 && widget.header;
-                      return TableRow(
-                        decoration: head
-                            ? const BoxDecoration(color: Color(TableSpec.headerFill))
-                            : null,
-                        children: List.generate(cols, (c) {
-                          if (r >= _ctrls.length || c >= _ctrls[r].length) {
-                            return const SizedBox.shrink();
-                          }
-                          final selected = r == _selR && c == _selC && _nodes[r][c].hasFocus;
-                          final ts = widget.style.copyWith(
-                            fontSize: fs,
-                            height: TableSpec.lineScale,
-                            fontWeight: head ? FontWeight.w700 : FontWeight.w400,
-                            color: ink,
-                          );
-                          final a = TableSpec.align(widget.aligns, c);
-                          return GestureDetector(
-                            key: ValueKey('cell-$r-$c'),
-                            onLongPress: widget.readOnly ? null : _openTableMenu,
-                            child: Container(
-                              // Always present (a null/non-null swap would
-                              // rebuild the field and close the keyboard).
-                              foregroundDecoration: BoxDecoration(
-                                border: Border.all(
-                                  color: selected && !widget.readOnly
-                                      ? const Color(0xFFC9A84C)
-                                      : const Color(0x00000000),
-                                  width: 1.6,
-                                ),
-                              ),
-                              padding: EdgeInsets.all(pad),
-                              child: TextField(
-                                controller: _ctrls[r][c],
-                                focusNode: _nodes[r][c],
-                                readOnly: widget.readOnly,
-                                maxLines: null,
-                                keyboardType: TextInputType.text,
-                                textInputAction: TextInputAction.next,
-                                textAlign: switch (a) {
-                                  'center' => TextAlign.center,
-                                  'right' => TextAlign.right,
-                                  _ => TextAlign.start,
-                                },
-                                style: ts,
-                                strutStyle: StrutStyle(
-                                  fontSize: fs,
-                                  height: TableSpec.lineScale,
-                                  forceStrutHeight: true,
-                                ),
-                                decoration: const InputDecoration.collapsed(hintText: ''),
-                                onTap: () {
-                                  widget.onActive(_ctrls[r][c]);
-                                  setState(() {
-                                    _selR = r;
-                                    _selC = c;
-                                  });
-                                },
-                                onChanged: (_) {
-                                  final ctrl = _ctrls[r][c];
-                                  final v = ctrl.text;
-                                  final grid = TableBlock.parseClipboardGrid(v);
-                                  if (grid != null &&
-                                      (v.contains('\t') || v.contains('\n')) &&
-                                      (grid.length > 1 || grid.first.length > 1)) {
-                                    ctrl.setLines(RichDoc.decode(widget.cells[r][c]));
-                                    widget.onPasteGrid(r, c, grid);
-                                    return;
-                                  }
-                                  if (v.contains('\n')) {
-                                    // Enter in a cell = next cell (cells are one paragraph).
-                                    ctrl.setLines(RichDoc.decode(_enc(ctrl).replaceAll('\n', ' ').trimRight()));
-                                    widget.onCellChanged(r, c, _enc(ctrl));
-                                    _move(0, 1);
-                                    return;
-                                  }
-                                  widget.onCellChanged(r, c, _enc(ctrl));
-                                },
-                                onEditingComplete: () => _move(0, 1),
-                              ),
+                      // Row height = tallest cell, measured like the engine
+                      // (lines × font × 1.35 + padding).
+                      var maxLines = 1;
+                      for (final (c, span) in CellAttr.visible(widget.cells[r], cols)) {
+                        if (r >= _ctrls.length || c >= _ctrls[r].length) continue;
+                        final w = colW.sublist(c, c + span).fold(0.0, (a, v) => a + v);
+                        final tp = TextPainter(
+                          text: TextSpan(
+                            text: _ctrls[r][c].text.isEmpty ? ' ' : _ctrls[r][c].text,
+                            style: widget.style.copyWith(
+                              fontSize: fs,
+                              height: TableSpec.lineScale,
+                              fontWeight: head ? FontWeight.w700 : FontWeight.w400,
                             ),
-                          );
-                        }),
+                          ),
+                          strutStyle: StrutStyle(fontSize: fs, height: TableSpec.lineScale, forceStrutHeight: true),
+                          textDirection: TextDirection.ltr,
+                        )..layout(maxWidth: (w - pad * 2).clamp(1.0, double.infinity));
+                        final n = tp.computeLineMetrics().length;
+                        tp.dispose();
+                        if (n > maxLines) maxLines = n;
+                      }
+                      final rowH = maxLines * fs * TableSpec.lineScale + pad * 2;
+                      return SizedBox(
+                        height: rowH,
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            for (final (c, span) in CellAttr.visible(widget.cells[r], cols))
+                              if (r < _ctrls.length && c < _ctrls[r].length)
+                                _cell(r, c, span, head, colW, fs, pad, ink, grid),
+                          ],
+                        ),
                       );
                     }),
                   ),

@@ -926,20 +926,28 @@ class PageLayoutEngine {
     final lh = st.size * TableSpec.lineScale;
     const pad = TableSpec.pad;
     var y = getY() + TableSpec.marginTop;
-    for (var r = 0; r < b.cells.length; r++) {
+    // Measures row r; returns its height and a painter for (page, y).
+    (double, void Function(LPage, double)) row(int r) {
       final head = r == 0 && b.tableHeader;
       final rowStyle = head ? st.copyWith(bold: true) : st;
-      // Wrap every cell first to know the row height.
+      final sp = measure(' ', rowStyle);
+      final vis = CellAttr.visible(b.cells[r], cols);
       final cellLines = <List<List<LWord>>>[];
+      final cellW = <double>[];
+      final cellX = <double>[];
+      final cellBg = <int?>[];
       var maxLines = 1;
-      for (var c = 0; c < cols; c++) {
-        final text = c < b.cells[r].length ? b.cells[r][c] : '';
+      for (final (c, span) in vis) {
+        final (bg, _, text) = CellAttr.parse(c < b.cells[r].length ? b.cells[r][c] : '');
+        final cw = colW.sublist(c, c + span).fold(0.0, (a, v) => a + v);
+        cellX.add(left + colW.sublist(0, c).fold(0.0, (a, v) => a + v));
+        cellW.add(cw);
+        cellBg.add(bg);
         final (toks, _) = _tokens(runs(text, rowStyle));
-        final avail = colW[c] - pad * 2;
+        final avail = cw - pad * 2;
         final lines = <List<LWord>>[];
         var cur = <LWord>[];
         var w = 0.0;
-        final sp = measure(' ', rowStyle);
         for (final t in toks) {
           final add = (cur.isEmpty ? 0 : sp) + t.width;
           if (cur.isNotEmpty && w + add > avail) {
@@ -955,38 +963,52 @@ class PageLayoutEngine {
         maxLines = math.max(maxLines, lines.length);
       }
       final rowH = maxLines * lh + pad * 2;
+      void paint(LPage page, double y) {
+        for (var i = 0; i < vis.length; i++) {
+          final x = cellX[i];
+          page.rects.add(LRect(x, y, cellW[i], rowH,
+              stroke: TableSpec.borderColor,
+              fill: cellBg[i] ?? (head ? TableSpec.headerFill : 0),
+              lineWidth: TableSpec.borderWidth));
+          final cellAlign = TableSpec.align(b.tableAligns, vis[i].$1);
+          var ly = y + pad;
+          for (final ln in cellLines[i]) {
+            final lw = ln.fold(0.0, (a, t) => a + t.width) + sp * (ln.length - 1);
+            final rtl = ln.any((t) => _arabic.hasMatch(t.text));
+            final free = cellW[i] - pad * 2 - lw;
+            var wx = x + pad + switch (cellAlign) {
+              'center' => free / 2,
+              'right' => free,
+              _ => rtl ? free : 0.0,
+            };
+            final placed = <LWord>[];
+            for (final t in (rtl ? ln.reversed : ln)) {
+              placed.add(LWord(t.text, t.style, wx, t.width));
+              wx += t.width + sp;
+            }
+            final base = ly + (lh - rowStyle.size) / 2 + rowStyle.size * 0.8;
+            page.lines.add(LLine(placed, base, ly, lh, false, 0));
+            ly += lh;
+          }
+        }
+      }
+
+      return (rowH, paint);
+    }
+
+    final header = b.tableHeader ? row(0) : null;
+    for (var r = 0; r < b.cells.length; r++) {
+      final (rowH, paint) = row(r);
       if (y + rowH > bottom) {
         newPage();
         y = getY();
-      }
-      final page = getPage();
-      var x = left;
-      for (var c = 0; c < cols; c++) {
-        page.rects.add(LRect(x, y, colW[c], rowH,
-            stroke: TableSpec.borderColor, fill: head ? TableSpec.headerFill : 0, lineWidth: TableSpec.borderWidth));
-        final cellAlign = TableSpec.align(b.tableAligns, c);
-        var ly = y + pad;
-        for (final ln in cellLines[c]) {
-          final sp = measure(' ', rowStyle);
-          final lw = ln.fold(0.0, (a, t) => a + t.width) + sp * (ln.length - 1);
-          final rtl = ln.any((t) => _arabic.hasMatch(t.text));
-          final free = colW[c] - pad * 2 - lw;
-          var wx = x + pad + switch (cellAlign) {
-            'center' => free / 2,
-            'right' => free,
-            _ => rtl ? free : 0.0,
-          };
-          final placed = <LWord>[];
-          for (final t in (rtl ? ln.reversed : ln)) {
-            placed.add(LWord(t.text, t.style, wx, t.width));
-            wx += t.width + sp;
-          }
-          final base = ly + (lh - rowStyle.size) / 2 + rowStyle.size * 0.8;
-          page.lines.add(LLine(placed, base, ly, lh, false, 0));
-          ly += lh;
+        // Long tables: repeat the header row at the top of each page (Word).
+        if (header != null && r > 0) {
+          header.$2(getPage(), y);
+          y += header.$1;
         }
-        x += colW[c];
       }
+      paint(getPage(), y);
       y += rowH;
       mark();
     }

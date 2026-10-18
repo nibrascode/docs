@@ -258,4 +258,50 @@ void main() {
     expect(src.x + src.width, closeTo(settings.pageW - settings.margin, 0.6));
     expect(doc.toc.single.title, 'Ön söz');
   });
+
+  testWidgets('table: merged cells and cell colours match the PDF; long tables repeat the header', (t) async {
+    const tb = '[TABLE]\n| A | B | C |\n| --- | --- | --- |\n| {span=2;bg=#FDE2E1}Birləşmiş xana |  | x |\n| 1 | {bg=#E3F2E1}2 | 3 |\n[/TABLE]';
+    final doc = await layout(t, tb);
+    final rects = tableRects(doc.pages.first);
+    expect(rects.length, 3 + 2 + 3);
+    final merged = rects[3];
+    expect(merged.w, closeTo(rects[0].w + rects[1].w, 0.01));
+    expect(merged.fill, 0xFFFDE2E1);
+    expect(rects[6].fill, 0xFFE3F2E1);
+    expect(doc.pages.first.lines.any((l) => l.words.any((w) => w.text.contains('{'))), isFalse);
+    await pumpCanvas(t, tb);
+    final box = t.getRect(find.byKey(const ValueKey('visual-table')));
+    final m = t.getRect(find.byKey(const ValueKey('cell-1-0')));
+    expect(m.width, closeTo(merged.w * k, 0.6));
+    expect(find.byKey(const ValueKey('cell-1-1')), findsNothing);
+    final c2 = t.getRect(find.byKey(const ValueKey('cell-1-2')));
+    expect(c2.left - box.left, closeTo((rects[4].x - rects[0].x) * k, 0.6));
+    for (var r = 0; r < 3; r++) {
+      final rr = t.getRect(find.byKey(ValueKey('cell-$r-${r == 1 ? 0 : 0}')));
+      expect(rr.top - box.top, closeTo((tableRects(doc.pages.first)[r == 0 ? 0 : (r == 1 ? 3 : 5)].y - rects[0].y) * k, 2.0));
+    }
+    expect(find.text('Birləşmiş xana'), findsOneWidget);
+    // Typing in a coloured/merged cell keeps its attributes.
+    final cell = find.descendant(of: find.byKey(const ValueKey('cell-1-0')), matching: find.byType(TextField));
+    await t.tap(cell);
+    await t.pump();
+    final c = t.widget<TextField>(cell).controller! as RichController;
+    t.testTextInput.updateEditingValue(TextEditingValue(text: '${c.text}!', selection: TextSelection.collapsed(offset: c.text.length + 1)));
+    await t.pump();
+    expect(saved, contains('| {bg=#FDE2E1;span=2}Birləşmiş xana! |'));
+    // DOCX gridSpan + shading, EPUB colspan.
+    final zip = ZipDecoder().decodeBytes(DocxWriter.build(tb, const DocxOptions()));
+    final d = String.fromCharCodes(zip.findFile('word/document.xml')!.content as List<int>);
+    expect(d, contains('<w:gridSpan w:val="2"/><w:shd w:val="clear" w:color="auto" w:fill="FDE2E1"/>'));
+    // Long table: header row repeated on every page.
+    final rows = List.generate(80, (i) => '| Sətir $i | dəyər $i |').join('\n');
+    final long = await layout(t, '[TABLE]\n| Ad | Dəyər |\n| --- | --- |\n$rows\n[/TABLE]');
+    expect(long.pages.length, greaterThan(1));
+    for (final p in long.pages) {
+      final rs = tableRects(p);
+      expect(rs.first.fill, TableSpec.headerFill, reason: 'page ${p.physical}');
+      final minTop = p.lines.map((l) => l.top).reduce((a, b) => a < b ? a : b);
+      expect(p.lines.where((l) => (l.top - minTop).abs() < 0.01).map((l) => l.words.first.text), containsAll(['Ad', 'Dəyər']));
+    }
+  });
 }

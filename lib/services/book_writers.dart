@@ -230,12 +230,15 @@ class DocxWriter {
           for (var r = 0; r < blk.cells.length; r++) {
             final head = r == 0 && blk.tableHeader;
             body.write(head ? '<w:tr><w:trPr><w:tblHeader/></w:trPr>' : '<w:tr>');
-            for (var c = 0; c < cols; c++) {
-              final t = c < blk.cells[r].length ? blk.cells[r][c] : '';
-              final shd = head ? '<w:shd w:val="clear" w:color="auto" w:fill="F1ECE0"/>' : '';
+            for (final (c, span) in CellAttr.visible(blk.cells[r], cols)) {
+              final (bg, _, t) = CellAttr.parse(c < blk.cells[r].length ? blk.cells[r][c] : '');
+              final fill = bg != null ? (bg & 0xFFFFFF).toRadixString(16).padLeft(6, '0').toUpperCase() : (head ? 'F1ECE0' : null);
+              final shd = fill != null ? '<w:shd w:val="clear" w:color="auto" w:fill="$fill"/>' : '';
+              final gs = span > 1 ? '<w:gridSpan w:val="$span"/>' : '';
+              final cwSum = cw.sublist(c, c + span).fold(0.0, (a, v) => a + v);
               final jc = switch (TableSpec.align(blk.tableAligns, c)) { 'center' => 'center', 'right' => 'right', _ => '' };
               final ppr = jc.isEmpty ? '' : '<w:pPr><w:jc w:val="$jc"/></w:pPr>';
-              body.write('<w:tc><w:tcPr><w:tcW w:w="${cw[c].round()}" w:type="pct"/>$shd</w:tcPr><w:p>$ppr${runsXml(head ? '**$t**' : t)}</w:p></w:tc>');
+              body.write('<w:tc><w:tcPr><w:tcW w:w="${cwSum.round()}" w:type="pct"/>$gs$shd</w:tcPr><w:p>$ppr${runsXml(head ? '**$t**' : t)}</w:p></w:tc>');
             }
             body.write('</w:tr>');
           }
@@ -483,7 +486,15 @@ class EpubWriter {
           for (var r = 0; r < blk.cells.length; r++) {
             final tag = r == 0 && blk.tableHeader ? 'th' : 'td';
             final row = blk.cells[r];
-            cur.write('<tr>${[for (var c = 0; c < row.length; c++) '<$tag${dir(row[c])} style="text-align:${TableSpec.align(blk.tableAligns, c)}">${inline(row[c])}</$tag>'].join()}</tr>');
+            final cellsHtml = [
+              for (final (c, span) in CellAttr.visible(row, ncols))
+                () {
+                  final (bg, _, t) = CellAttr.parse(c < row.length ? row[c] : '');
+                  final bgCss = bg == null ? '' : ';background:#${(bg & 0xFFFFFF).toRadixString(16).padLeft(6, '0')}';
+                  return '<$tag${dir(t)}${span > 1 ? ' colspan="$span"' : ''} style="text-align:${TableSpec.align(blk.tableAligns, c)}$bgCss">${inline(t)}</$tag>';
+                }()
+            ];
+            cur.write('<tr>${cellsHtml.join()}</tr>');
           }
           cur.write('</table>');
           if (blk.tableCaption.isNotEmpty) cur.write('<p class="caption">${inline(blk.tableCaption)}</p>');

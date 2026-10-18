@@ -29,3 +29,42 @@ class TableSpec {
     return switch (a) { 'c' => 'center', 'r' => 'right', _ => 'left' };
   }
 }
+
+/// Per-cell attributes stored as a prefix in the cell text:
+/// `{bg=#RRGGBB;span=2}text`. span = columns merged to the right.
+class CellAttr {
+  static final _re = RegExp(r'^\{((?:bg=#[0-9A-Fa-f]{6}|span=\d{1,2})(?:;(?:bg=#[0-9A-Fa-f]{6}|span=\d{1,2}))*)\}');
+
+  static (int? bg, int span, String text) parse(String raw) {
+    final m = _re.firstMatch(raw);
+    if (m == null) return (null, 1, raw);
+    int? bg;
+    var span = 1;
+    for (final part in m.group(1)!.split(';')) {
+      if (part.startsWith('bg=#')) bg = 0xFF000000 | int.parse(part.substring(4), radix: 16);
+      if (part.startsWith('span=')) span = int.parse(part.substring(5)).clamp(1, 16);
+    }
+    return (bg, span, raw.substring(m.end));
+  }
+
+  static String make(int? bg, int span, String text) {
+    final parts = [
+      if (bg != null) 'bg=#${(bg & 0xFFFFFF).toRadixString(16).padLeft(6, '0').toUpperCase()}',
+      if (span > 1) 'span=$span',
+    ];
+    return parts.isEmpty ? text : '{${parts.join(';')}}$text';
+  }
+
+  /// For row [row] of a table with [cols] columns: list of (col, span) for
+  /// the visible cells (cells covered by a merge are skipped).
+  static List<(int, int)> visible(List<String> row, int cols) {
+    final out = <(int, int)>[];
+    var c = 0;
+    while (c < cols) {
+      final span = c < row.length ? parse(row[c]).$2.clamp(1, cols - c) : 1;
+      out.add((c, span));
+      c += span;
+    }
+    return out;
+  }
+}
