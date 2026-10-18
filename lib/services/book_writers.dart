@@ -1,4 +1,5 @@
 // DOCX and EPUB writers built on the same markup parser as the page layout.
+import '../core/table_spec.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
@@ -154,6 +155,24 @@ class DocxWriter {
         case DocBlockKind.pageBreak:
           body.write('<w:p><w:r><w:br w:type="page"/></w:r></w:p>');
           break;
+        case DocBlockKind.toc:
+          // Real Word TOC field (Word fills page numbers on open).
+          para('**${blk.text}**', align: 'center');
+          final es = PageLayoutEngine.scanHeadings(content).where((e) => e.level <= blk.tocLevels).toList();
+          final instr = '<w:r><w:fldChar w:fldCharType="begin" w:dirty="true"/></w:r>'
+              '<w:r><w:instrText xml:space="preserve"> TOC \\o "1-${blk.tocLevels}" \\h \\z \\u </w:instrText></w:r>'
+              '<w:r><w:fldChar w:fldCharType="separate"/></w:r>';
+          const end = '<w:r><w:fldChar w:fldCharType="end"/></w:r>';
+          if (es.isEmpty) {
+            body.write('<w:p>$instr$end</w:p>');
+          }
+          for (var i = 0; i < es.length; i++) {
+            final e = es[i];
+            body.write('<w:p><w:pPr><w:tabs><w:tab w:val="right" w:leader="dot" w:pos="9000"/></w:tabs>'
+                '<w:ind w:left="${(e.level - 1) * 280}"/></w:pPr>${i == 0 ? instr : ''}'
+                '<w:r><w:t xml:space="preserve">${_x(e.title)}</w:t></w:r>${i == es.length - 1 ? end : ''}</w:p>');
+          }
+          break;
         case DocBlockKind.sceneBreak:
           para('*   *   *', align: 'center', raw: true);
           break;
@@ -196,13 +215,18 @@ class DocxWriter {
               '<w:tblBorders><w:top w:val="single" w:sz="4" w:color="555555"/><w:left w:val="single" w:sz="4" w:color="555555"/>'
               '<w:bottom w:val="single" w:sz="4" w:color="555555"/><w:right w:val="single" w:sz="4" w:color="555555"/>'
               '<w:insideH w:val="single" w:sz="4" w:color="555555"/><w:insideV w:val="single" w:sz="4" w:color="555555"/>'
-              '</w:tblBorders></w:tblPr>');
+              '</w:tblBorders><w:tblLayout w:type="fixed"/></w:tblPr>');
+          final cw = TableSpec.columnWidths(blk.widths, cols, 5000);
+          body.write('<w:tblGrid>${cw.map((w) => '<w:gridCol w:w="${w.round()}"/>').join()}</w:tblGrid>');
           for (var r = 0; r < blk.cells.length; r++) {
-            body.write(r == 0 ? '<w:tr><w:trPr><w:tblHeader/></w:trPr>' : '<w:tr>');
+            final head = r == 0 && blk.tableHeader;
+            body.write(head ? '<w:tr><w:trPr><w:tblHeader/></w:trPr>' : '<w:tr>');
             for (var c = 0; c < cols; c++) {
               final t = c < blk.cells[r].length ? blk.cells[r][c] : '';
-              final shd = r == 0 ? '<w:shd w:val="clear" w:color="auto" w:fill="F1ECE0"/>' : '';
-              body.write('<w:tc><w:tcPr>$shd</w:tcPr><w:p>${runsXml(r == 0 ? '**$t**' : t)}</w:p></w:tc>');
+              final shd = head ? '<w:shd w:val="clear" w:color="auto" w:fill="F1ECE0"/>' : '';
+              final jc = switch (TableSpec.align(blk.tableAligns, c)) { 'center' => 'center', 'right' => 'right', _ => '' };
+              final ppr = jc.isEmpty ? '' : '<w:pPr><w:jc w:val="$jc"/></w:pPr>';
+              body.write('<w:tc><w:tcPr><w:tcW w:w="${cw[c].round()}" w:type="pct"/>$shd</w:tcPr><w:p>$ppr${runsXml(head ? '**$t**' : t)}</w:p></w:tc>');
             }
             body.write('</w:tr>');
           }
@@ -404,6 +428,13 @@ class EpubWriter {
         case DocBlockKind.pageBreak:
           cur.write('<div class="pb"></div>');
           break;
+        case DocBlockKind.toc:
+          cur.write('<nav class="toc"><p class="toctitle"><b>${_x(blk.text)}</b></p><ul style="list-style:none;padding:0">');
+          for (final e in PageLayoutEngine.scanHeadings(content).where((e) => e.level <= blk.tocLevels)) {
+            cur.write('<li style="margin-left:${(e.level - 1) * 1.2}em"${dir(e.title)}>${_x(e.title)}</li>');
+          }
+          cur.write('</ul></nav>');
+          break;
         case DocBlockKind.sceneBreak:
           cur.write('<p class="scene">*&#160;&#160;*&#160;&#160;*</p>');
           break;
@@ -424,10 +455,13 @@ class EpubWriter {
               '${blk.imageCaption.isEmpty ? '' : '<figcaption>${inline(blk.imageCaption)}</figcaption>'}</figure>');
           break;
         case DocBlockKind.table:
-          cur.write('<table>');
+          final ncols = blk.cells.fold<int>(0, (a, r) => r.length > a ? r.length : a);
+          final pw = TableSpec.columnWidths(blk.widths, ncols, 100);
+          cur.write('<table style="table-layout:fixed;width:100%"><colgroup>${pw.map((w) => '<col style="width:${w.toStringAsFixed(1)}%"/>').join()}</colgroup>');
           for (var r = 0; r < blk.cells.length; r++) {
-            final tag = r == 0 ? 'th' : 'td';
-            cur.write('<tr>${blk.cells[r].map((c) => '<$tag${dir(c)}>${inline(c)}</$tag>').join()}</tr>');
+            final tag = r == 0 && blk.tableHeader ? 'th' : 'td';
+            final row = blk.cells[r];
+            cur.write('<tr>${[for (var c = 0; c < row.length; c++) '<$tag${dir(row[c])} style="text-align:${TableSpec.align(blk.tableAligns, c)}">${inline(row[c])}</$tag>'].join()}</tr>');
           }
           cur.write('</table>');
           if (blk.tableCaption.isNotEmpty) cur.write('<p class="caption">${inline(blk.tableCaption)}</p>');

@@ -9,6 +9,10 @@ class TableBlock {
   final List<List<String>> cells;
   final List<double> colWidths; // relative 0.5–2.0
   final String caption;
+  /// Per-column alignment: 'l', 'c' or 'r'.
+  final List<String> colAligns;
+  /// First row is a header (bold, shaded).
+  final bool header;
 
   TableBlock({
     required this.start,
@@ -16,6 +20,8 @@ class TableBlock {
     required this.cells,
     required this.colWidths,
     this.caption = '',
+    this.colAligns = const [],
+    this.header = true,
   });
 
   static final RegExp blockRe = RegExp(
@@ -75,12 +81,23 @@ class TableBlock {
       }
     }
     final cap = RegExp(r'\[CAP\](.*)$', multiLine: true).firstMatch(body)?.group(1)?.trim() ?? '';
+    final aligns = List<String>.filled(cols, 'l');
+    final aLine = RegExp(r'\[A\]\s*([lcr ]+)').firstMatch(body);
+    if (aLine != null) {
+      final a = aLine.group(1)!.trim().split(RegExp(r'\s+'));
+      for (var i = 0; i < cols && i < a.length; i++) {
+        aligns[i] = a[i];
+      }
+    }
+    final header = !RegExp(r'^\s*\[H\]\s*0', multiLine: true).hasMatch(body);
     return TableBlock(
       start: m.start,
       end: m.end,
       cells: cells,
       colWidths: widths,
       caption: cap,
+      colAligns: aligns,
+      header: header,
     );
   }
 
@@ -90,6 +107,10 @@ class TableBlock {
     if (colWidths.any((w) => (w - 1.0).abs() > 0.01)) {
       buf.writeln('[W] ${colWidths.map((w) => w.toStringAsFixed(2)).join(' ')}');
     }
+    if (colAligns.any((a) => a != 'l')) {
+      buf.writeln('[A] ${colAligns.join(' ')}');
+    }
+    if (!header) buf.writeln('[H] 0');
     for (var r = 0; r < cells.length; r++) {
       buf.writeln('| ${cells[r].map((c) => c.replaceAll('|', '/')).join(' | ')} |');
       if (r == 0) {
@@ -376,6 +397,8 @@ class TableEditorDialog extends StatefulWidget {
   final List<List<String>>? initialData;
   final List<double>? initialWidths;
   final String initialCaption;
+  final List<String> initialAligns;
+  final bool initialHeader;
   final bool editing;
 
   const TableEditorDialog({
@@ -385,6 +408,8 @@ class TableEditorDialog extends StatefulWidget {
     this.initialData,
     this.initialWidths,
     this.initialCaption = '',
+    this.initialAligns = const [],
+    this.initialHeader = true,
     this.editing = false,
   });
 
@@ -395,6 +420,8 @@ class TableEditorDialog extends StatefulWidget {
     String caption = '',
     int rows = 3,
     int cols = 3,
+    List<String> aligns = const [],
+    bool header = true,
     bool editing = false,
   }) {
     return showModalBottomSheet<String>(
@@ -407,6 +434,8 @@ class TableEditorDialog extends StatefulWidget {
         initialData: data,
         initialWidths: widths,
         initialCaption: caption,
+        initialAligns: aligns,
+        initialHeader: header,
         editing: editing,
       ),
     );
@@ -576,6 +605,8 @@ class _TableEditorDialogState extends State<TableEditorDialog> {
       cells: _snapshot(),
       colWidths: List<double>.from(_widths),
       caption: _caption.text,
+      colAligns: [for (var c = 0; c < _widths.length; c++) c < widget.initialAligns.length ? widget.initialAligns[c] : 'l'],
+      header: widget.initialHeader,
     );
     return '\n${block.toMarkup()}\n';
   }

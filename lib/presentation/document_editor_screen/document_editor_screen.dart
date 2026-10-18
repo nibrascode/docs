@@ -1,3 +1,4 @@
+import '../../core/toc.dart';
 import 'package:docspro/widgets/dark_sheet.dart';
 import '../../routes/app_routes.dart';
 import 'package:flutter/material.dart';
@@ -1573,6 +1574,8 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
         data: existing.cells,
         widths: existing.colWidths,
         caption: existing.caption,
+        aligns: existing.colAligns,
+        header: existing.header,
         editing: true,
       );
       if (md == null || md.isEmpty) return;
@@ -1614,7 +1617,7 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
 
 
   static final RegExp _tocBlockRe = RegExp(
-    r'\[TOC\][\s\S]*?\[/TOC\]',
+    r'\[TOC[^\]]*\][\s\S]*?\[/TOC\]',
     multiLine: true,
   );
 
@@ -1660,8 +1663,7 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
       _showTocOptions();
       return;
     }
-    final body = _buildTocBody(maxLevel: maxLevel);
-    final toc = _wrapToc(body);
+    final toc = '${TocSpec.marker(TocSpec.defaultTitle, maxLevel)}\n\n';
     var text = _bodyCtrl.text;
     final has = _tocBlockRe.hasMatch(text);
     // Also remove legacy "# Table of Contents" blocks without markers
@@ -2129,6 +2131,8 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
       data: existing.cells,
       widths: existing.colWidths,
       caption: existing.caption,
+      aligns: existing.colAligns,
+      header: existing.header,
       editing: true,
     );
     if (md == null || md.isEmpty) return;
@@ -2309,7 +2313,12 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
 
   Future<void> _insertFootnote() async {
     _syncCursorFromCanvas();
-    final n = RegExp(r'\[\^(\d+)\]').allMatches(_bodyCtrl.text).length + 1;
+    // Next free number (each note appears twice: marker + definition).
+    final n = RegExp(r'\[\^(\d+)\]')
+            .allMatches(_bodyCtrl.text)
+            .map((m) => int.parse(m.group(1)!))
+            .fold<int>(0, (a, b) => b > a ? b : a) +
+        1;
     final ctrl = TextEditingController();
     final note = await showDialog<String>(
       context: context,
@@ -4497,6 +4506,9 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
                           onEditImage: _editImageAt,
                           onDeleteImage: _deleteImageAt,
                           pageAspect: _pageH / _pageW,
+                          tocEntries: _layout?.toc ?? const [],
+                          pxPerPt: (style.fontSize ?? 14) /
+                              (_docSettings.fontSize * 0.75).clamp(7.0, 28.0),
                           onEditCover: _openCoverGallery,
                         ),
                       ),

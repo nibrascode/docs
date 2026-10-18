@@ -6,6 +6,9 @@
 // the same places.
 import 'dart:io';
 import 'dart:math' as math;
+
+import 'table_spec.dart';
+import 'toc.dart';
 import 'dart:ui' as ui;
 
 import 'package:flutter/painting.dart';
@@ -201,6 +204,8 @@ class LayoutSettings {
 class DocLayout {
   final LayoutSettings settings;
   final List<LPage> pages;
+  /// Headings with their printed page labels (drives the TOC).
+  List<TocEntry> toc = const [];
   DocLayout(this.settings, this.pages);
 }
 
@@ -364,8 +369,24 @@ class PageLayoutEngine {
     return (words, glue);
   }
 
+  /// Lays out [content]. A table of contents needs the final page numbers,
+  /// so documents with one are laid out until the numbers are stable.
   Future<DocLayout> layout(String content) async {
+    var d = await _pass(content, null);
+    if (!content.contains('[TOC')) return d;
+    for (var i = 0; i < 3; i++) {
+      final next = await _pass(content, d.toc);
+      final same = next.toc.length == d.toc.length &&
+          [for (var k = 0; k < d.toc.length; k++) next.toc[k] == d.toc[k]].every((e) => e);
+      d = next;
+      if (same) break;
+    }
+    return d;
+  }
+
+  Future<DocLayout> _pass(String content, List<TocEntry>? tocIn) async {
     final pages = <LPage>[];
+    final heads = <(int, String, LPage)>[];
     final m = s.margin;
     final headerH = s.hasHeader ? s.bodyPt * 1.6 + 6 : 0.0;
     final footerH = s.hasFooter ? s.bodyPt * 1.6 + 6 : 0.0;
@@ -613,6 +634,44 @@ class PageLayoutEngine {
         case DocBlockKind.pageBreak:
           if (pageHasContent) newPage();
           break;
+        case DocBlockKind.toc:
+          placePara(para(b.text, body.copyWith(size: body.size * TocSpec.titleScale, bold: true), offset,
+              raw: true, align: 'center', before: lineH(body) * 0.5, after: lineH(body) * 0.6));
+          final entries = (tocIn ?? scanHeadings(content)).where((e) => e.level <= b.tocLevels);
+          for (final e in entries) {
+            final st = e.level == 1 ? body.copyWith(bold: true) : body;
+            final lh = lineH(st);
+            if (y + lh > bottom && pageHasContent) newPage();
+            final x0 = left + (e.level - 1) * TocSpec.indentPerLevel;
+            final pw = measure(e.page, st);
+            final avail = left + width - x0 - pw - measure(' ', st) * 2;
+            var title = e.title.isEmpty ? ' ' : e.title;
+            if (measure(title, scriptStyle(title, st)) > avail) {
+              while (title.length > 1 && measure('$title…', scriptStyle(title, st)) > avail) {
+                title = title.substring(0, title.length - 1);
+              }
+              title = '$title…';
+            }
+            final ts = scriptStyle(title, st);
+            final tw = measure(title, ts);
+            final dotW = measure('.', body);
+            final dotsStart = x0 + tw + measure(' ', st);
+            final dotsEnd = left + width - pw - measure(' ', st);
+            final n = dotW <= 0 ? 0 : ((dotsEnd - dotsStart) / dotW).floor();
+            final dots = n > 0 ? '.' * n : '';
+            final rtl = _arabic.hasMatch(title);
+            final words = <LWord>[
+              LWord(title, ts, rtl ? left + width - tw : x0, tw),
+              if (dots.isNotEmpty) LWord(dots, body.copyWith(color: 0xFF888888), dotsEnd - n * dotW, n * dotW),
+              LWord(e.page, st, rtl ? left : left + width - pw, pw),
+            ];
+            if (rtl && dots.isNotEmpty) words[1] = LWord(dots, body.copyWith(color: 0xFF888888), left + pw + measure(' ', st), n * dotW);
+            page.lines.add(LLine(words, y + (lh - st.size) / 2 + st.size * 0.8, y, lh, rtl, offset));
+            y += lh + TocSpec.entryGap;
+            pageHasContent = true;
+          }
+          y += lineH(body) * 0.5;
+          break;
         case DocBlockKind.sceneBreak:
           placePara(para('*   *   *', body, offset, raw: true, align: 'center', before: lineH(body) * 0.5, after: lineH(body) * 0.5));
           break;
@@ -688,12 +747,15 @@ class PageLayoutEngine {
               firstChapter = false;
               placePara(para(t.substring(2), body.copyWith(size: body.size * 1.55, bold: true), here,
                   align: 'center', before: lineH(body), after: lineH(body) * 0.6, newPage: np));
+              heads.add((1, TocSpec.plain(t.substring(2)), page));
             } else if (t.startsWith('## ')) {
               placePara(para(t.substring(3), body.copyWith(size: body.size * 1.22, bold: true), here,
                   before: lineH(body) * 0.7, after: lineH(body) * 0.3));
+              heads.add((2, TocSpec.plain(t.substring(3)), page));
             } else if (t.startsWith('### ')) {
               placePara(para(t.substring(4), body.copyWith(size: body.size * 1.05, bold: true), here,
                   before: lineH(body) * 0.5, after: lineH(body) * 0.2));
+              heads.add((3, TocSpec.plain(t.substring(4)), page));
             } else if (t.startsWith('> ')) {
               placePara(para(t.substring(2), body.copyWith(size: body.size * 0.95, italic: true, color: 0xFF424242), here,
                   align: chunkAlign, leftIndent: 18, before: 2, after: 2));
@@ -732,7 +794,26 @@ class PageLayoutEngine {
             s.pageNumberStartAt + (physical - s.pageNumberStartPage), s.pageNumberStyle);
       }
     }
-    return DocLayout(s, pages);
+    final out = DocLayout(s, pages);
+    out.toc = [
+      for (final (lv, t, pg) in heads)
+        TocEntry(lv, t, pg.pageLabel.isNotEmpty ? pg.pageLabel : '${pg.physical}')
+    ];
+    return out;
+  }
+
+  /// Headings in document order (first pass: page numbers unknown).
+  static List<TocEntry> scanHeadings(String content) {
+    final out = <TocEntry>[];
+    for (final b in DocumentBlocks.parse(content)) {
+      if (b.kind != DocBlockKind.text) continue;
+      for (final l in b.text.split('\n')) {
+        final t = l.trim().replaceFirst(RegExp(r'^\[align=\w+\]'), '');
+        final lv = TocSpec.levelOf(t);
+        if (lv > 0) out.add(TocEntry(lv, TocSpec.plain(t.substring(lv + 1)), '00'));
+      }
+    }
+    return out;
   }
 
   static bool _empty(LPage p) =>
@@ -755,15 +836,14 @@ class PageLayoutEngine {
     if (b.cells.isEmpty) return;
     final cols = b.cells.map((r) => r.length).fold(0, math.max);
     if (cols == 0) return;
-    final rel = List<double>.generate(cols, (i) => i < b.widths.length ? b.widths[i].clamp(0.3, 3.0) : 1.0);
-    final sum = rel.fold(0.0, (a, c) => a + c);
-    final colW = rel.map((r) => width * r / sum).toList();
-    final st = body.copyWith(size: body.size * 0.85);
-    final lh = st.size * 1.35;
-    const pad = 4.0;
-    var y = getY() + 4;
+    final colW = TableSpec.columnWidths(b.widths, cols, width);
+    final st = body.copyWith(size: body.size * TableSpec.fontScale);
+    final lh = st.size * TableSpec.lineScale;
+    const pad = TableSpec.pad;
+    var y = getY() + TableSpec.marginTop;
     for (var r = 0; r < b.cells.length; r++) {
-      final rowStyle = r == 0 ? st.copyWith(bold: true) : st;
+      final head = r == 0 && b.tableHeader;
+      final rowStyle = head ? st.copyWith(bold: true) : st;
       // Wrap every cell first to know the row height.
       final cellLines = <List<List<LWord>>>[];
       var maxLines = 1;
@@ -798,13 +878,21 @@ class PageLayoutEngine {
       var x = left;
       for (var c = 0; c < cols; c++) {
         page.rects.add(LRect(x, y, colW[c], rowH,
-            stroke: 0xFF555555, fill: r == 0 ? 0xFFF1ECE0 : 0, lineWidth: 0.6));
+            stroke: TableSpec.borderColor, fill: head ? TableSpec.headerFill : 0, lineWidth: TableSpec.borderWidth));
+        final cellAlign = TableSpec.align(b.tableAligns, c);
         var ly = y + pad;
         for (final ln in cellLines[c]) {
-          var wx = x + pad;
           final sp = measure(' ', rowStyle);
+          final lw = ln.fold(0.0, (a, t) => a + t.width) + sp * (ln.length - 1);
+          final rtl = ln.any((t) => _arabic.hasMatch(t.text));
+          final free = colW[c] - pad * 2 - lw;
+          var wx = x + pad + switch (cellAlign) {
+            'center' => free / 2,
+            'right' => free,
+            _ => rtl ? free : 0.0,
+          };
           final placed = <LWord>[];
-          for (final t in ln) {
+          for (final t in (rtl ? ln.reversed : ln)) {
             placed.add(LWord(t.text, t.style, wx, t.width));
             wx += t.width + sp;
           }
@@ -819,12 +907,12 @@ class PageLayoutEngine {
     }
     if (b.tableCaption.isNotEmpty) {
       final page = getPage();
-      final cs = body.copyWith(size: body.size * 0.8, italic: true);
+      final cs = body.copyWith(size: body.size * TableSpec.captionScale, italic: true);
       final w = measure(b.tableCaption, cs);
       page.lines.add(LLine([LWord(b.tableCaption, cs, left + (width - w) / 2, w)],
           y + cs.size * 1.2, y, cs.size * 1.5, false, 0));
       y += cs.size * 1.6;
     }
-    setY(y + 6);
+    setY(y + TableSpec.marginBottom);
   }
 }
