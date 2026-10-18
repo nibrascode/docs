@@ -44,6 +44,13 @@ android {
         }
     }
 
+    // Compress native libs in the APK (keeps the single-ABI APK small enough to share).
+    packaging {
+        jniLibs {
+            useLegacyPackaging = true
+        }
+    }
+
     buildTypes {
         release {
             signingConfig = if (keystorePropertiesFile.exists()) {
