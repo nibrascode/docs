@@ -36,7 +36,7 @@ const table = '''[TABLE]
 String saved = '';
 final canvasKey = GlobalKey<DocumentCanvasState>();
 
-Future<void> pumpCanvas(WidgetTester t, String text, {List<TocEntry> toc = const []}) async {
+Future<void> pumpCanvas(WidgetTester t, String text, {List<TocEntry> toc = const [], List<PageStart> starts = const []}) async {
   saved = text;
   t.binding.defaultBinaryMessenger.setMockMethodCallHandler(SystemChannels.platform, (call) async => null);
   await t.pumpWidget(LocalizationsProvider(
@@ -56,6 +56,7 @@ Future<void> pumpCanvas(WidgetTester t, String text, {List<TocEntry> toc = const
                 readOnly: false,
                 pxPerPt: k,
                 tocEntries: toc,
+                pageStarts: starts,
                 onEditTable: (_) async {},
                 onDeleteTable: (_) {},
                 onEditImage: (_) async {},
@@ -302,6 +303,40 @@ void main() {
       expect(rs.first.fill, TableSpec.headerFill, reason: 'page ${p.physical}');
       final minTop = p.lines.map((l) => l.top).reduce((a, b) => a < b ? a : b);
       expect(p.lines.where((l) => (l.top - minTop).abs() < 0.01).map((l) => l.words.first.text), containsAll(['Ad', 'Dəyər']));
+    }
+  });
+
+  testWidgets('editor shows page ends exactly where the PDF breaks pages', (t) async {
+    final para = List.filled(60, 'Bu cümlə səhifəni doldurmaq üçün yazılıb.').join(' ');
+    final text = 'Giriş.\n\n$para';
+    final doc = await layout(t, text);
+    expect(doc.pages.length, greaterThan(2));
+    final starts = PageStart.fromLayout(doc);
+    expect(starts.length, doc.pages.length - 1);
+    await pumpCanvas(t, text, starts: starts);
+    await t.pump();
+    await t.pump();
+    final ys = canvasKey.currentState!.pageBreakYs;
+    expect(ys.length, doc.pages.length - 1);
+    // Engine: y of each page's first body line measured from the first
+    // line of page 1, in editor pixels, with page tops stacked.
+    final lh = settings.bodyPt * settings.lineHeight * k;
+    for (var i = 0; i < ys.length; i++) {
+      final linesBefore = [for (var p = 0; p <= i; p++) doc.pages[p].lines.where((l) => l.sourceOffset >= 0).length].reduce((a, b) => a + b);
+      // + one blank line between "Giriş." and the paragraph
+      expect(ys[i].$1, closeTo((linesBefore + 1) * lh, lh * 0.6), reason: 'page ${i + 2}');
+      expect(ys[i].$2, '${i + 2}');
+    }
+    expect(find.byKey(const ValueKey('page-break-2')), findsOneWidget);
+    // A page that starts with a table: line at the table's top.
+    final t2 = '${List.filled(40, 'Sətir.').join('\n')}\n$table';
+    final d2 = await layout(t, t2);
+    final s2 = PageStart.fromLayout(d2);
+    if (s2.any((p) => p.offset < 0)) {
+      await pumpCanvas(t, t2, starts: s2);
+      await t.pump();
+      await t.pump();
+      expect(canvasKey.currentState!.pageBreakYs, isNotEmpty);
     }
   });
 }

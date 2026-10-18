@@ -4388,6 +4388,7 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
               final eng = _layout?.pages.length ?? 0;
               final pageCount = (est > eng ? est : eng).clamp(1, 400);
               final sheetH = dh * pageCount;
+              final exact = _layout != null && _layout!.pages.length > 1;
 
               Alignment numAlign = Alignment.bottomCenter;
               final pos = _docSettings.pageNumberPos;
@@ -4410,12 +4411,15 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
                 height: sheetH,
                 child: Stack(
                   children: [
-                    for (int p = 0; p < pageCount; p++)
+                    // With the engine's page starts known, the editor is one
+                    // continuous sheet and the exact page ends are drawn as
+                    // dashed lines (same breaks as the PDF).
+                    for (int p = 0; p < (exact ? 1 : pageCount); p++)
                       Positioned(
                         top: dh * p,
                         left: 0,
                         width: dw,
-                        height: dh,
+                        height: exact ? sheetH : dh,
                         child: Container(
                           decoration: BoxDecoration(
                             color: _focusMode
@@ -4515,6 +4519,9 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
                           onDeleteImage: _deleteImageAt,
                           pageAspect: _pageH / _pageW,
                           tocEntries: _layout?.toc ?? const [],
+                          pageStarts: _layout == null
+                              ? const []
+                              : PageStart.fromLayout(_layout!),
                           pxPerPt: (style.fontSize ?? 14) /
                               (_docSettings.fontSize * 0.75).clamp(7.0, 28.0),
                           onEditCover: _openCoverGallery,

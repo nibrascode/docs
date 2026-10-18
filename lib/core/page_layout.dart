@@ -154,6 +154,9 @@ class LPage {
   /// page-end lines): engine offset of the paragraph and its visual line.
   int startOffset = -1;
   int startK = 0;
+  /// Index (DocumentBlocks.parse) of the block that was being placed when
+  /// this page started.
+  int startBlock = -1;
   String header = '';
   String pageLabel = '';
   int physical = 0;
@@ -424,13 +427,14 @@ class PageLayoutEngine {
     final width = s.pageW - m * 2;
     final body = LStyle(family: layoutFamily(s.fontFamily), size: s.bodyPt, color: s.ink);
 
+    var curBlock = 0;
     LPage page = LPage();
     pages.add(page);
     var y = top;
     var pageHasContent = false;
 
     void newPage() {
-      page = LPage();
+      page = LPage()..startBlock = curBlock;
       pages.add(page);
       y = top;
       pageHasContent = false;
@@ -665,6 +669,7 @@ class PageLayoutEngine {
     final allBlocks = DocumentBlocks.parse(content);
     for (var bi = 0; bi < allBlocks.length; bi++) {
       final b = allBlocks[bi];
+      curBlock = bi;
       switch (b.kind) {
         case DocBlockKind.cover:
           final c = CoverData.parse(b.text);

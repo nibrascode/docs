@@ -5,6 +5,7 @@ import '../../../core/rich_markup.dart';
 import '../../../core/rich_doc.dart';
 import '../../../core/rich_controller.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/rendering.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import 'book_cover_sheet.dart';
@@ -258,6 +259,66 @@ class DocumentBlocks {
   }
 }
 
+/// Start of a page as laid out by the page engine.
+class PageStart {
+  final int block; // DocumentBlocks index
+  final int offset; // engine text offset of the paragraph (-1: block start)
+  final int k; // visual line inside that paragraph
+  final String label; // printed page number
+  const PageStart(this.block, this.offset, this.k, this.label);
+
+  static List<PageStart> fromLayout(DocLayout d) => [
+        for (var i = 1; i < d.pages.length; i++)
+          if (d.pages[i].startBlock >= 0)
+            PageStart(d.pages[i].startBlock, d.pages[i].startOffset, d.pages[i].startK,
+                d.pages[i].pageLabel.isNotEmpty ? d.pages[i].pageLabel : '${d.pages[i].physical}'),
+      ];
+}
+
+/// Dashed page-end marker drawn where the PDF starts a new page.
+class _PageEndLine extends StatelessWidget {
+  final String label;
+  const _PageEndLine({required this.label});
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 14,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: CustomPaint(size: const Size(double.infinity, 1), painter: _DashPainter()),
+          ),
+          Positioned(
+            top: 2,
+            right: 0,
+            child: Text('— $label —',
+                style: const TextStyle(fontSize: 9, color: Color(0xFFB54708), fontWeight: FontWeight.w600)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DashPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final p = Paint()
+      ..color = const Color(0xCCB54708)
+      ..strokeWidth = 1;
+    for (var x = 0.0; x < size.width; x += 9) {
+      canvas.drawLine(Offset(x, 0), Offset(x + 5, 0), p);
+    }
+  }
+
+  @override
+  bool shouldRepaint(_DashPainter old) => false;
+}
+
 class DocumentCanvas extends StatefulWidget {
   final String text;
   final ValueChanged<String> onChanged;
@@ -276,6 +337,8 @@ class DocumentCanvas extends StatefulWidget {
   final double pxPerPt;
   /// Headings with page numbers from the page engine (same as the PDF).
   final List<TocEntry> tocEntries;
+  /// Where the page engine (= PDF) starts each page after the first.
+  final List<PageStart> pageStarts;
   final VoidCallback? onEditCover;
 
   const DocumentCanvas({
@@ -294,6 +357,7 @@ class DocumentCanvas extends StatefulWidget {
     this.pageAspect = 1.414,
     this.pxPerPt = 4 / 3,
     this.tocEntries = const [],
+    this.pageStarts = const [],
     this.onEditCover,
   });
 
@@ -534,19 +598,85 @@ class DocumentCanvasState extends State<DocumentCanvas> {
     widget.onChanged(s);
   }
 
+  final Map<int, GlobalKey> _blockKeys = {};
+  final Map<int, GlobalKey<_ParagraphEditorState>> _paraKeys = {};
+  final GlobalKey _stackKey = GlobalKey();
+  List<(double, String)> _breakYs = const [];
+  bool _measureQueued = false;
+
+  /// Measured y of each engine page start (for tests too).
+  List<(double, String)> get pageBreakYs => _breakYs;
+
+  void _queueMeasure() {
+    if (_measureQueued || widget.pageStarts.isEmpty && _breakYs.isEmpty) return;
+    _measureQueued = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _measureQueued = false;
+      if (!mounted) return;
+      final ref = _stackKey.currentContext?.findRenderObject() as RenderBox?;
+      if (ref == null || !ref.hasSize) return;
+      final out = <(double, String)>[];
+      for (final ps in widget.pageStarts) {
+        double? y;
+        if (ps.block < 0 || ps.block >= _blocks.length) continue;
+        final b = _blocks[ps.block];
+        if (ps.offset >= 0 && b.kind == DocBlockKind.text) {
+          var base = 0;
+          for (var i = 0; i < ps.block; i++) {
+            if (_blocks[i].kind == DocBlockKind.text) base += _blocks[i].text.length;
+          }
+          final local = (ps.offset - base).clamp(0, b.text.length);
+          final rawLine = '\n'.allMatches(b.text.substring(0, local)).length;
+          y = _paraKeys[ps.block]?.currentState?.yOf(rawLine, ps.k, ref);
+        }
+        if (y == null) {
+          final box = _blockKeys[ps.block]?.currentContext?.findRenderObject() as RenderBox?;
+          if (box != null && box.attached) y = ref.globalToLocal(box.localToGlobal(Offset.zero)).dy;
+        }
+        if (y != null) out.add((y, ps.label));
+      }
+      final same = out.length == _breakYs.length &&
+          [for (var i = 0; i < out.length; i++) (out[i].$1 - _breakYs[i].$1).abs() < 0.5 && out[i].$2 == _breakYs[i].$2]
+              .every((e) => e);
+      if (!same) setState(() => _breakYs = out);
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
+    final col = _buildBlocks(context);
+    _queueMeasure();
+    return Stack(
+      key: _stackKey,
+      clipBehavior: Clip.none,
+      children: [
+        col,
+        for (final (y, label) in _breakYs)
+          Positioned(
+            key: ValueKey('page-break-$label'),
+            top: y - 1,
+            left: -6,
+            right: -6,
+            child: IgnorePointer(child: _PageEndLine(label: label)),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildBlocks(BuildContext context) {
     _tableOrdinal = 0;
     _imageOrdinal = 0;
     var textIndex = 0;
     final children = <Widget>[];
     for (var i = 0; i < _blocks.length; i++) {
       final b = _blocks[i];
+      final before = children.length;
       switch (b.kind) {
         case DocBlockKind.text:
           final ctrl = _textCtrls[textIndex++];
           children.add(
             _ParagraphEditor(
+              key: _paraKeys.putIfAbsent(i, () => GlobalKey<_ParagraphEditorState>()),
               hasPrev: i > 0,
               hasNext: i < _blocks.length - 1,
               master: ctrl,
@@ -817,6 +947,12 @@ class DocumentCanvasState extends State<DocumentCanvas> {
             );
           }
           break;
+      }
+      if (children.length > before) {
+        children[before] = KeyedSubtree(
+          key: _blockKeys.putIfAbsent(i, () => GlobalKey()),
+          child: children[before],
+        );
       }
     }
     return Column(
@@ -1731,6 +1867,7 @@ class _G {
   String align;
   final RichController c;
   final FocusNode f = FocusNode();
+  final GlobalKey key = GlobalKey();
   bool rtl = false;
   _G(this.align, this.c);
 }
@@ -1764,6 +1901,7 @@ class _ParagraphEditor extends StatefulWidget {
   final bool hasPrev, hasNext;
 
   const _ParagraphEditor({
+    super.key,
     this.hasPrev = false,
     this.hasNext = false,
     required this.master,
@@ -2134,6 +2272,33 @@ class _ParagraphEditorState extends State<_ParagraphEditor> {
     );
   }
 
+  /// Y (in [ref]'s coordinates) of the top of visual line [k] of raw line
+  /// [rawLine] of this block, or null if not laid out.
+  double? yOf(int rawLine, int k, RenderBox ref) {
+    var line = rawLine - (_lead ? 1 : 0);
+    if (line < 0) line = 0;
+    final (gi, off) = _locate(line, 0);
+    if (gi < 0 || gi >= _gs.length) return null;
+    final ro = _gs[gi].key.currentContext?.findRenderObject();
+    if (ro == null) return null;
+    RenderEditable? re;
+    void walk(RenderObject o) {
+      if (re != null) return;
+      if (o is RenderEditable) {
+        re = o;
+        return;
+      }
+      o.visitChildren(walk);
+    }
+
+    walk(ro);
+    final ed = re;
+    if (ed == null || !ed.attached || !ref.attached) return null;
+    final caret = ed.getLocalRectForCaret(TextPosition(offset: off.clamp(0, _gs[gi].c.text.length)));
+    final y = caret.top + k * ed.preferredLineHeight;
+    return ref.globalToLocal(ed.localToGlobal(Offset(0, y))).dy;
+  }
+
   @override
   Widget build(BuildContext context) {
     final empty = _gs.length == 1 && _gs.first.c.text.isEmpty;
@@ -2142,7 +2307,7 @@ class _ParagraphEditorState extends State<_ParagraphEditor> {
       children: [
         for (var i = 0; i < _gs.length; i++)
           TextField(
-            key: ObjectKey(_gs[i]),
+            key: _gs[i].key,
             controller: _gs[i].c,
             focusNode: _gs[i].f,
             readOnly: widget.readOnly,
