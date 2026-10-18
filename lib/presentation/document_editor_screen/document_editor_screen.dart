@@ -4383,7 +4383,10 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
                 textAlign: _textAlign,
               )..layout(maxWidth: (dw - pad * 2).clamp(40, 2000));
               final innerH = (dh - pad * 2).clamp(48.0, dh);
-              final pageCount = (tp.height / innerH).ceil().clamp(1, 400);
+              // At least as many sheets as the page engine (= PDF) makes.
+              final est = (tp.height / innerH).ceil();
+              final eng = _layout?.pages.length ?? 0;
+              final pageCount = (est > eng ? est : eng).clamp(1, 400);
               final sheetH = dh * pageCount;
 
               Alignment numAlign = Alignment.bottomCenter;
