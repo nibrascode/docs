@@ -4,11 +4,11 @@ Android üçün oflayn sənəd redaktoru. Kitab, məktub, hesabat yazın, PDF/Wo
 
 ## GitHub ilə APK (xətasız yığım)
 
-Repo: [mmuxax-bot/docspro](https://github.com/mmuxax-bot/docspro)
+Repo: [nibrascode/docs](https://github.com/nibrascode/docs)
 
 Hər `main` push-da GitHub Actions **release APK** yığır.
 
-1. [Actions](https://github.com/mmuxax-bot/docspro/actions) səhifəsini açın
+1. [Actions](https://github.com/nibrascode/docs/actions) səhifəsini açın
 2. **Build Android APK** workflow-una girin
 3. Yaşıl (success) run-u açın
 4. Aşağıda **Artifacts** → `nibras-docs-apk` yükləyin

@@ -41,6 +41,16 @@ jobs:
             exit 1
           fi
 
+      - name: Write env.json from secrets (optional)
+        working-directory: ${{ steps.root.outputs.dir }}
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          if [ -n "$SUPABASE_URL" ]; then
+            printf '{"SUPABASE_URL":"%s","SUPABASE_ANON_KEY":"%s"}' "$SUPABASE_URL" "$SUPABASE_ANON_KEY" > env.json
+          fi
+
       - name: Install dependencies
         working-directory: ${{ steps.root.outputs.dir }}
         run: flutter pub get

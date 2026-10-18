@@ -314,14 +314,14 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
     _scheduleAutoSave();
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
+        SnackBar(
           content: Text(AppLocalizations.of(context).t(
             az: 'Kitab ayarları yeniləndi',
             en: 'Book settings updated',
             ru: 'Настройки обновлены',
             ar: 'تم تحديث الإعدادات',
           )),
-          duration: Duration(seconds: 1),
+          duration: const Duration(seconds: 1),
         ),
       );
     }

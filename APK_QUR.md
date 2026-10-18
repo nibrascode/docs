@@ -5,7 +5,7 @@ Sənədlər telefonda saxlanır (SharedPreferences). İnternet yalnız istəyə 
 
 ## Ən asan yol: GitHub Actions
 
-1. https://github.com/mmuxax-bot/docspro
+1. https://github.com/nibrascode/docs
 2. **Actions** → **Build Android APK**
 3. Yaşıl run → **Artifacts** → `nibras-docs-apk`
 4. `app-release.apk` telefona quraşdırın
@@ -17,8 +17,8 @@ Kod `main`-ə düşəndə APK avtomatik yığılır. Əl ilə: **Run workflow**.
 Tələblər: Flutter 3.35+ (Dart 3.9), Android SDK, Java 17.
 
 ```
-git clone https://github.com/mmuxax-bot/docspro.git
-cd docspro
+git clone https://github.com/nibrascode/docs.git
+cd docs
 flutter pub get
 flutter build apk --release
 ```
