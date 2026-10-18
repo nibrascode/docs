@@ -1,3 +1,4 @@
+import 'package:docspro/widgets/dark_sheet.dart';
 import '../../../core/rich_markup.dart';
 import '../../../core/cover_art.dart';
 import 'dart:math' as math;
@@ -1338,7 +1339,7 @@ Future<CoverData?> showCoverGallery({
   required bool landscape,
   required CoverData initial,
 }) {
-  return showModalBottomSheet<CoverData>(
+  return showDarkSheet<CoverData>(
     context: context,
     isScrollControlled: true,
     backgroundColor: const Color(0xFF121212),
@@ -1774,7 +1775,7 @@ class _CoverEditorState extends State<_CoverEditor> {
         style: const TextStyle(color: Colors.white),
         decoration: InputDecoration(
           labelText: label,
-          labelStyle: const TextStyle(color: Colors.white54),
+          labelStyle: const TextStyle(color: Colors.white70),
         ),
       ),
     );

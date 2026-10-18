@@ -1,3 +1,4 @@
+import 'package:docspro/widgets/dark_sheet.dart';
 import '../../routes/app_routes.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -733,7 +734,7 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
       {'id': 'bullet', 'label': 'Bullet list', 'sample': '• Item'},
       {'id': 'number', 'label': 'Numbered list', 'sample': '1. Item'},
     ];
-    showModalBottomSheet(
+    showDarkSheet(
       context: context,
       backgroundColor: const Color(0xFF121212),
       shape: const RoundedRectangleBorder(
@@ -809,7 +810,7 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
   }
 
   void _showChaptersPanel() {
-    showModalBottomSheet(
+    showDarkSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: const Color(0xFF121212),
@@ -1529,10 +1530,11 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
           ),
         );
       }
-    } catch (e) {
+    } catch (e, st) {
+      debugPrint("Error: $e\n$st");
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not pick image: $e')),
+          SnackBar(content: Text('Şəkil seçilmədi. Yenidən cəhd edin.')),
         );
       }
     }
@@ -1715,7 +1717,7 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
   void _showTocOptions() {
     final has = _tocBlockRe.hasMatch(_bodyCtrl.text) ||
         _bodyCtrl.text.contains('# Table of Contents');
-    showModalBottomSheet(
+    showDarkSheet(
       context: context,
       backgroundColor: const Color(0xFF121212),
       shape: const RoundedRectangleBorder(
@@ -1790,7 +1792,7 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
   void _showHeaderFooterDialog() {
     final headerCtrl = TextEditingController(text: _headerText);
     final footerCtrl = TextEditingController(text: _footerText);
-    showModalBottomSheet(
+    showDarkSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: const Color(0xFF121212),
@@ -2346,7 +2348,7 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
           ? 'Personajlar:\n- \n\nMəkanlar:\n- \n\nSüjet:\n- \n'
           : _docSettings.bookNotes,
     );
-    showModalBottomSheet(
+    showDarkSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: const Color(0xFF121212),
@@ -2580,10 +2582,11 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
     final title = _extractTitle();
     try {
       await Share.share(_exportSource(), subject: title);
-    } catch (e) {
+    } catch (e, st) {
+      debugPrint("Error: $e\n$st");
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Paylaşılmadı: $e')),
+        SnackBar(content: Text('Paylaşmaq alınmadı. Yenidən cəhd edin.')),
       );
     }
   }
@@ -2613,7 +2616,7 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
     final map = BookStructure.nameIndex(_bodyCtrl.text);
     final keys = map.keys.toList()
       ..sort((a, b) => map[b]!.compareTo(map[a]!));
-    showModalBottomSheet(
+    showDarkSheet(
       context: context,
       backgroundColor: const Color(0xFF121212),
       isScrollControlled: true,
@@ -2712,7 +2715,7 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
     final remain = (goal - words).clamp(0, 9999999);
     final session = _sessionWords;
     final daily = _docSettings.dailyGoal <= 0 ? 1000 : _docSettings.dailyGoal;
-    showModalBottomSheet(
+    showDarkSheet(
       context: context,
       backgroundColor: const Color(0xFF121212),
       builder: (ctx) {
@@ -2866,11 +2869,12 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
           ),
         );
       }
-    } catch (e) {
+    } catch (e, st) {
+      debugPrint("Error: $e\n$st");
       if (mounted) {
         setState(() => _isSaving = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Saxlanılmadı: $e')),
+          SnackBar(content: Text('Sənəd saxlanılmadı. Yenidən cəhd edin.')),
         );
       }
     }

@@ -261,10 +261,11 @@ class _DocumentsListScreenState extends State<DocumentsListScreen>
         final created = _docs.where((d) => d.id == id).toList();
         if (created.isNotEmpty) await _openEditor(created.first);
         return;
-      } catch (e) {
+      } catch (e, st) {
+        debugPrint("Error: $e\n$st");
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(
-              l10n.t(az: 'Fayl oxunmadı: $e', en: 'Could not read file: $e', ru: 'Не удалось прочитать файл: $e', ar: 'تعذرت قراءة الملف: $e'))));
+              l10n.t(az: 'Fayl oxunmadı.', en: 'Could not read file.', ru: 'Не удалось прочитать файл.', ar: 'تعذرت قراءة الملف.'))));
         }
         return;
       }
@@ -393,10 +394,11 @@ class _DocumentsListScreenState extends State<DocumentsListScreen>
     final body = plain.trim().isEmpty ? title : plain;
     try {
       await Share.share(body, subject: title);
-    } catch (e) {
+    } catch (e, st) {
+      debugPrint("Error: $e\n$st");
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Paylaşılmadı: $e')),
+        SnackBar(content: Text('Paylaşmaq alınmadı. Yenidən cəhd edin.')),
       );
     }
   }

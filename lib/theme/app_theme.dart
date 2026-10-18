@@ -152,8 +152,10 @@ class AppTheme {
         borderRadius: BorderRadius.circular(12),
         borderSide: const BorderSide(color: primary, width: 2),
       ),
+      labelStyle: const TextStyle(color: Color(0xFF4A5578)),
+      floatingLabelStyle: const TextStyle(color: primary),
       hintStyle: const TextStyle(
-        color: Color(0xFFAAAAAA),
+        color: Color(0xFF7A8299),
         fontWeight: FontWeight.w400,
       ),
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -171,6 +173,12 @@ class AppTheme {
         fontWeight: FontWeight.w500,
         color: Color(0xFF0D1B3E),
       ),
+      secondaryLabelStyle: const TextStyle(
+        fontSize: 13,
+        fontWeight: FontWeight.w600,
+        color: Colors.white,
+      ),
+      checkmarkColor: Colors.white,
       side: const BorderSide(color: outlineLight),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(100)),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
@@ -295,8 +303,10 @@ class AppTheme {
         borderRadius: BorderRadius.circular(12),
         borderSide: const BorderSide(color: goldLight, width: 2),
       ),
+      labelStyle: const TextStyle(color: Color(0xFFB8C4E0)),
+      floatingLabelStyle: const TextStyle(color: goldLight),
       hintStyle: const TextStyle(
-        color: Color(0xFF5A6A8A),
+        color: Color(0xFF94A3C4),
         fontWeight: FontWeight.w400,
       ),
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -305,6 +315,31 @@ class AppTheme {
       color: outlineVariantDark,
       thickness: 1,
       space: 1,
+    ),
+    chipTheme: ChipThemeData(
+      backgroundColor: surfaceVariantDark,
+      selectedColor: goldLight,
+      labelStyle: const TextStyle(
+        fontSize: 13,
+        fontWeight: FontWeight.w500,
+        color: Color(0xFFE8EAF6),
+      ),
+      secondaryLabelStyle: const TextStyle(
+        fontSize: 13,
+        fontWeight: FontWeight.w600,
+        color: primary,
+      ),
+      checkmarkColor: primary,
+      side: const BorderSide(color: outlineDark),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(100)),
+    ),
+    textButtonTheme: TextButtonThemeData(
+      style: TextButton.styleFrom(foregroundColor: goldLight),
+    ),
+    textSelectionTheme: const TextSelectionThemeData(
+      cursorColor: goldLight,
+      selectionColor: Color(0x66E8C97A),
+      selectionHandleColor: goldLight,
     ),
     floatingActionButtonTheme: const FloatingActionButtonThemeData(
       backgroundColor: gold,
@@ -315,4 +350,17 @@ class AppTheme {
       ),
     ),
   );
+
+  /// Theme for the editor's dark (#121212) bottom sheets. The app runs in
+  /// light mode, so without this their fields/chips inherited light colours
+  /// (white fills, navy selected chips) and became unreadable.
+  static ThemeData get sheetTheme {
+    final d = darkTheme;
+    return d.copyWith(
+      canvasColor: const Color(0xFF121212),
+      inputDecorationTheme: d.inputDecorationTheme.copyWith(
+        fillColor: const Color(0xFF1F2430),
+      ),
+    );
+  }
 }
