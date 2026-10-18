@@ -681,7 +681,13 @@ class PageLayoutEngine {
             } else if (RegExp(r'^\[\^\d+\]:').hasMatch(t)) {
               placePara(para(t, body.copyWith(size: body.size * 0.72), here));
             } else {
-              placePara(para(t, body, here, indentFirst: s.firstLineIndent));
+              // Leading spaces = indent level (2 per level); lists never get a
+              // first-line indent.
+              final lead = RegExp(r'^ +').firstMatch(t)?.group(0)?.length ?? 0;
+              final tt = t.substring(lead);
+              final isList = RegExp(r'^(•|-|\d+[.)]) ').hasMatch(tt);
+              placePara(para(tt, body, here,
+                  leftIndent: (lead ~/ 2) * 14.0, indentFirst: s.firstLineIndent && lead == 0 && !isList));
             }
           }
           break;

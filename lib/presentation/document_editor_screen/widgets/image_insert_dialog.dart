@@ -88,7 +88,7 @@ class _ImageInsertDialogState extends State<ImageInsertDialog> {
         color: Color(0xFF121212),
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      child: Column(
+      child: Material(type: MaterialType.transparency, child: Column(
         children: [
           const SizedBox(height: 10),
           Container(
@@ -240,7 +240,7 @@ class _ImageInsertDialogState extends State<ImageInsertDialog> {
             ),
           ),
         ],
-      ),
+      )),
     );
   }
 }

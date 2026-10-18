@@ -609,11 +609,13 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
     final sel = _bodyCtrl.selection;
     final pos = sel.isValid ? sel.start : text.length;
     // Work on whole paragraph
-    var lineStart = text.lastIndexOf('\n', pos - 1) + 1;
-    if (lineStart < 0) lineStart = 0;
+    var lineStart = pos <= 0 ? 0 : text.lastIndexOf('\n', pos - 1) + 1;
     var lineEnd = text.indexOf('\n', pos);
     if (lineEnd < 0) lineEnd = text.length;
     var line = text.substring(lineStart, lineEnd);
+    final am = RegExp(r'^\[align=\w+\]').firstMatch(line);
+    final alignPrefix = am?.group(0) ?? '';
+    line = line.substring(alignPrefix.length);
     final body = _stripStylePrefix(line);
 
     String next;
@@ -630,7 +632,7 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
         next = '### ${body.isEmpty ? 'Subsection' : body}';
         break;
       case 'h4':
-        next = '#### ${body.isEmpty ? 'Title' : body}';
+        next = '### ${body.isEmpty ? 'Title' : body}';
         break;
       case 'quote':
         next = '> $body';
@@ -639,13 +641,23 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
         next = '> **Note:** $body';
         break;
       case 'bullet':
-        next = '• $body';
+        // Toggle: applying a bullet to a bullet line removes it.
+        next = line.trimLeft().startsWith('• ') ? body : '• $body';
         break;
       case 'number':
-        next = '1. $body';
+        if (RegExp(r'^\s*\d+[.)] ').hasMatch(line)) {
+          next = body;
+        } else {
+          // Continue numbering from the line above.
+          final prevEnd = lineStart > 0 ? lineStart - 1 : 0;
+          final prevStart = prevEnd <= 0 ? 0 : text.lastIndexOf('\n', prevEnd - 1) + 1;
+          final prev = lineStart > 0 ? text.substring(prevStart, prevEnd) : '';
+          final n = int.tryParse(RegExp(r'^\s*(\d+)[.)] ').firstMatch(prev)?.group(1) ?? '') ?? 0;
+          next = '${n + 1}. $body';
+        }
         break;
       case 'caption':
-        next = '_${body.isEmpty ? 'Caption' : body}_';
+        next = '[align=center]*${body.isEmpty ? 'Caption' : body}*';
         break;
       case 'normal':
         next = body;
@@ -654,6 +666,8 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
         next = body;
     }
 
+    // Headings are centred by the layout; drop alignment for them.
+    if (!next.startsWith('#')) next = alignPrefix + next;
     final newText = text.replaceRange(lineStart, lineEnd, next);
     _bodyCtrl.value = TextEditingValue(
       text: newText,
@@ -3436,14 +3450,19 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
   }
 
   void _indentParagraph(int delta) {
+    _syncCursorFromCanvas();
     final text = _bodyCtrl.text;
     final (start, end) = _paragraphRange();
     var para = text.substring(start, end);
+    // Keep an [align=…] prefix in front of the indent.
+    final am = RegExp(r'^\[align=\w+\]').firstMatch(para);
+    final alignPrefix = am?.group(0) ?? '';
+    para = para.substring(alignPrefix.length);
     // Count leading spaces (2 per level)
     final leading = RegExp(r'^ *').firstMatch(para)?.group(0)?.length ?? 0;
     final level = (leading ~/ 2 + delta).clamp(0, 8);
     para = para.replaceFirst(RegExp(r'^ *'), '');
-    para = ('  ' * level) + para;
+    para = alignPrefix + ('  ' * level) + para;
     final newText = text.replaceRange(start, end, para);
     _bodyCtrl.value = TextEditingValue(
       text: newText,
@@ -4585,6 +4604,15 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
 
   void _showToolbarSheet(BuildContext context, ThemeData theme, String title) {
     final l10n = AppLocalizations.of(context);
+    // These open their own UI; never pop a route while it is building.
+    if (title == l10n.styles) {
+      _showStylesSheet();
+      return;
+    }
+    if (title == l10n.image) {
+      _pickImage();
+      return;
+    }
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -4592,16 +4620,6 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (ctx) {
-        if (title == l10n.styles) {
-          Navigator.pop(ctx);
-          Future.microtask(() => _showStylesSheet());
-          return const SizedBox.shrink();
-        }
-        if (title == l10n.image) {
-          Navigator.pop(ctx);
-          Future.microtask(() => _pickImage());
-          return const SizedBox.shrink();
-        }
         if (title == l10n.textStyle) return _buildFontStyleSheet(ctx, theme);
         if (title == l10n.color) return _buildColorSheet(ctx, theme);
         return _buildInsertSheet(ctx, theme);
@@ -5278,7 +5296,7 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
   }
 
   Widget _sheetTab(ThemeData theme, String label, bool isActive) {
-    return Expanded(
+    return SizedBox(
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 8),
         decoration: BoxDecoration(

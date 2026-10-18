@@ -236,7 +236,7 @@ class _TableSizePickerSheetState extends State<_TableSizePickerSheet> {
         color: Color(0xFF121212),
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      child: SafeArea(
+      child: Material(type: MaterialType.transparency, child: SafeArea(
         top: false,
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -365,7 +365,7 @@ class _TableSizePickerSheetState extends State<_TableSizePickerSheet> {
             ),
           ],
         ),
-      ),
+      )),
     );
   }
 }
@@ -596,7 +596,7 @@ class _TableEditorDialogState extends State<TableEditorDialog> {
         color: Color(0xFF121212),
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      child: Column(
+      child: Material(type: MaterialType.transparency, child: Column(
         children: [
           const SizedBox(height: 10),
           Container(
@@ -810,7 +810,7 @@ class _TableEditorDialogState extends State<TableEditorDialog> {
             ),
           ),
         ],
-      ),
+      )),
     );
   }
 
