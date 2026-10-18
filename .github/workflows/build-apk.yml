@@ -1,0 +1,100 @@
+name: Build Android APK
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Flutter version
+        run: flutter --version
+
+      - name: Locate Flutter project
+        id: root
+        run: |
+          if [ -f pubspec.yaml ]; then
+            echo "dir=." >> $GITHUB_OUTPUT
+          elif [ -f docspro/pubspec.yaml ]; then
+            echo "dir=docspro" >> $GITHUB_OUTPUT
+          else
+            echo "pubspec.yaml not found" >&2
+            find . -name pubspec.yaml | head
+            exit 1
+          fi
+
+      - name: Install dependencies
+        working-directory: ${{ steps.root.outputs.dir }}
+        run: flutter pub get
+
+      - name: Fix duplicate launcher color
+        working-directory: ${{ steps.root.outputs.dir }}
+        run: |
+          mkdir -p android/app/src/main/res/values
+          rm -f android/app/src/main/res/values/ic_launcher_background.xml
+          cat > android/app/src/main/res/values/colors.xml << 'XML'
+          <?xml version="1.0" encoding="utf-8"?>
+          <resources>
+              <color name="ic_launcher_background">#0A1628</color>
+          </resources>
+          XML
+
+      - name: Generate app icon
+        working-directory: ${{ steps.root.outputs.dir }}
+        run: dart run flutter_launcher_icons
+        continue-on-error: true
+
+      - name: Remove duplicate after icon gen
+        working-directory: ${{ steps.root.outputs.dir }}
+        run: |
+          rm -f android/app/src/main/res/values/ic_launcher_background.xml
+          if [ -f android/app/src/main/res/values/colors.xml ]; then
+            if ! grep -q ic_launcher_background android/app/src/main/res/values/colors.xml; then
+              cat > android/app/src/main/res/values/colors.xml << 'XML'
+          <?xml version="1.0" encoding="utf-8"?>
+          <resources>
+              <color name="ic_launcher_background">#0A1628</color>
+          </resources>
+          XML
+            fi
+          fi
+
+      - name: Tests
+        working-directory: ${{ steps.root.outputs.dir }}
+        run: flutter test
+        continue-on-error: true
+
+      - name: Build APK (release)
+        working-directory: ${{ steps.root.outputs.dir }}
+        run: |
+          if [ -f env.json ]; then
+            flutter build apk --release --dart-define-from-file=env.json
+          else
+            flutter build apk --release
+          fi
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: nibras-docs-apk
+          path: |
+            ${{ steps.root.outputs.dir }}/build/app/outputs/flutter-apk/app-release.apk
+          retention-days: 14
