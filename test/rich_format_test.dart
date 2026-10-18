@@ -153,6 +153,18 @@ void main() {
     });
   });
 
+  test('links render as links in layout, EPUB and PDF', () async {
+    const doc = 'See [Nibras](https://nibrascode.com) now.';
+    final rs = PageLayoutEngine.runs(doc, const LStyle(family: 'LibreBaskerville', size: 12));
+    final l = rs.firstWhere((e) => e.$1 == 'Nibras');
+    expect(l.$2.link, 'https://nibrascode.com');
+    expect(l.$2.underline, isTrue);
+    expect(RichMarkup.parse(doc).plain, doc); // atomic element keeps its source
+    final ep = EpubWriter.build('# C\n\n$doc', title: 't');
+    final x = ZipDecoder().decodeBytes(ep).files.where((f) => f.name.endsWith('.xhtml')).map((f) => utf8.decode(f.content as List<int>)).join();
+    expect(x, contains('<a href="https://nibrascode.com">'));
+  });
+
   testWidgets('editor: select a word, colour it, type more, round-trip', (tester) async {
     var saved = '';
     final key = GlobalKey<DocumentCanvasState>();

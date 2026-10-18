@@ -1839,6 +1839,17 @@ class MarkupTextController extends TextEditingController {
         raw = p.re[k];
         continue;
       }
+      if (p.isLink(k)) {
+        final (lt, url) = ParsedMarkup.linkParts(e);
+        children.add(const TextSpan(text: '[', style: _hidden));
+        children.add(TextSpan(
+          text: lt,
+          style: ls.copyWith(color: const Color(0xFF175CD3), decoration: TextDecoration.underline),
+        ));
+        children.add(TextSpan(text: '](' + url + ')', style: _hidden));
+        raw = p.re[k];
+        continue;
+      }
       if (p.isFootnote(k)) {
         children.add(const TextSpan(text: '[^', style: _hidden));
         children.add(TextSpan(

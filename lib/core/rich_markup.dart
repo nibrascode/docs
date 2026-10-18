@@ -106,7 +106,14 @@ class ParsedMarkup {
 
   int get length => el.length;
   String get plain => el.join();
-  bool isFootnote(int i) => el[i].length > 1;
+  bool isFootnote(int i) => el[i].startsWith('[^');
+  bool isLink(int i) => el[i].length > 1 && !isFootnote(i);
+
+  /// "[text](url)" → (text, url).
+  static (String, String) linkParts(String e) {
+    final m = e.indexOf('](');
+    return (e.substring(1, m), e.substring(m + 2, e.length - 1));
+  }
 
   /// Number of elements fully before a raw caret offset.
   int plainAt(int raw) {
@@ -144,6 +151,7 @@ class RichMarkup {
     r'|\[font=([A-Za-z][A-Za-z0-9 ]{0,40})\]'
     r'|\[/(color|bg|size|font)\]'
     r'|\[\^\d+\]'
+    r'|\[[^\[\]\n]{1,200}\]\((?:https?://|mailto:)[^\s)]+\)'
     r'|\*\*|__|~~|\*',
   );
   static final _ws = RegExp(r'\s');
@@ -191,8 +199,8 @@ class RichMarkup {
         val = m.group(4);
       } else if (m.group(5) != null) {
         kind = '-${m.group(5)}';
-      } else if (t.startsWith('[^')) {
-        kind = 'fn';
+      } else if (t.startsWith('[^') || t.contains('](')) {
+        kind = 'fn'; // atomic: footnote reference or link
       } else {
         kind = t;
       }

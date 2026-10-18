@@ -36,6 +36,7 @@ class LStyle {
   final int color;
   final int bg; // 0 = none
   final bool sup;
+  final String? link;
 
   const LStyle({
     required this.family,
@@ -47,6 +48,7 @@ class LStyle {
     this.color = 0xFF1A1A1A,
     this.bg = 0,
     this.sup = false,
+    this.link,
   });
 
   LStyle copyWith({
@@ -58,6 +60,7 @@ class LStyle {
     int? color,
     int? bg,
     bool? sup,
+    String? link,
   }) =>
       LStyle(
         family: family,
@@ -69,6 +72,7 @@ class LStyle {
         color: color ?? this.color,
         bg: bg ?? this.bg,
         sup: sup ?? this.sup,
+        link: link ?? this.link,
       );
 
   /// Bundled fonts have Regular, Bold and Italic only (no BoldItalic):
@@ -86,7 +90,7 @@ class LStyle {
 
   LStyle withFamily(String f) => LStyle(
       family: f, size: size, bold: bold, italic: italic, underline: underline,
-      strike: strike, color: color, bg: bg, sup: sup);
+      strike: strike, color: color, bg: bg, sup: sup, link: link);
 
   String get key => '$family|$size|$bold|$italic';
 }
@@ -293,7 +297,17 @@ class PageLayoutEngine {
       final sp = p.st[k];
       LStyle ls;
       String text = p.el[k];
-      if (p.isFootnote(k)) {
+      if (p.isLink(k)) {
+        final (lt, url) = ParsedMarkup.linkParts(text);
+        text = lt;
+        ls = st.copyWith(
+          bold: st.bold || sp.bold,
+          italic: st.italic || sp.italic,
+          underline: true,
+          color: 0xFF175CD3,
+          link: url,
+        );
+      } else if (p.isFootnote(k)) {
         text = text.substring(2, text.length - 1);
         ls = st.copyWith(size: st.size * 0.62, bold: true, sup: true, color: 0xFF8C1C13);
       } else {
@@ -322,7 +336,7 @@ class PageLayoutEngine {
 
   static bool _same(LStyle a, LStyle b) =>
       a.family == b.family && a.size == b.size && a.bold == b.bold && a.italic == b.italic &&
-      a.underline == b.underline && a.strike == b.strike && a.color == b.color && a.bg == b.bg && a.sup == b.sup;
+      a.underline == b.underline && a.strike == b.strike && a.color == b.color && a.bg == b.bg && a.sup == b.sup && a.link == b.link;
 
   /// Tokenises runs into words (spaces are separators, not tokens).
   /// Words glued to the previous one (style change mid-word) are kept as

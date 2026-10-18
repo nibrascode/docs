@@ -357,6 +357,7 @@ class EpubWriter {
           if (st.family != _base.family) "font-family:'${cssFamily(st.family)}'",
         ];
         if (css.isNotEmpty) h = '<span style="${css.join(';')}">$h</span>';
+        if (st.link != null) h = '<a href="${_x(st.link!)}">$h</a>';
         b.write(h);
       }
       return b.toString();

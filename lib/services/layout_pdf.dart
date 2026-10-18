@@ -93,6 +93,11 @@ class _PageCanvas extends pw.Widget {
         g
           ..setFillColor(_c(st.color))
           ..drawString(font, st.size, _visual(w.text), w.x, fy(base));
+        if (st.link != null) {
+          // Clickable link over the word.
+          PdfAnnot(context.page,
+              PdfAnnotUrlLink(rect: PdfRect(w.x, fy(base) - st.size * 0.25, w.width, st.size * 1.1), url: st.link!));
+        }
         if (st.underline || st.strike) {
           final uy = st.underline ? base + st.size * 0.12 : base - st.size * 0.28;
           g
