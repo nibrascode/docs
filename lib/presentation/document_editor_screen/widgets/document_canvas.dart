@@ -272,6 +272,22 @@ class DocumentCanvasState extends State<DocumentCanvas> {
   TextSelection? _savedSel;
   TextEditingController? _activeCtrl;
   void Function(String align)? _aligner;
+  int Function()? _cursorFn;
+  DocBlock? _cursorBlock;
+
+  /// Cursor offset in the full serialized document, or null if no text
+  /// paragraph has been focused yet.
+  String serialized() => DocumentBlocks.serialize(_blocks);
+
+  int? globalCursor() {
+    final fn = _cursorFn;
+    final blk = _cursorBlock;
+    if (fn == null || blk == null) return null;
+    final idx = _blocks.indexOf(blk);
+    if (idx < 0) return null;
+    final prefix = DocumentBlocks.serialize(_blocks.sublist(0, idx)).length;
+    return prefix + fn();
+  }
 
   bool alignFocused(String align) {
     final fn = _aligner;
@@ -460,6 +476,10 @@ class DocumentCanvasState extends State<DocumentCanvas> {
               firstLineIndent: widget.firstLineIndent,
               onActive: (c) => _activeCtrl = c,
               onBindAlign: (fn) => _aligner = fn,
+              onBindCursor: (fn) {
+                _cursorFn = fn;
+                _cursorBlock = b;
+              },
               onColor: _colorMenu,
               onWrap: wrapFocused,
             ),
@@ -1375,6 +1395,7 @@ class _VisualTableState extends State<_VisualTable> {
 class _P {
   String align;
   final TextEditingController c;
+  final FocusNode f = FocusNode();
   _P(this.align, this.c);
 }
 
@@ -1388,6 +1409,7 @@ class _ParagraphEditor extends StatefulWidget {
   final void Function(void Function(String align) fn) onBindAlign;
   final VoidCallback onColor;
   final bool Function(String left, String right) onWrap;
+  final void Function(int Function() masterCursor) onBindCursor;
 
   const _ParagraphEditor({
     required this.master,
@@ -1399,6 +1421,7 @@ class _ParagraphEditor extends StatefulWidget {
     required this.onBindAlign,
     required this.onColor,
     required this.onWrap,
+    required this.onBindCursor,
   });
 
   @override
@@ -1417,7 +1440,30 @@ class _ParagraphEditorState extends State<_ParagraphEditor> {
     super.initState();
     _load(widget.master.text);
     widget.master.addListener(_onMaster);
+  }
+
+  /// This block became the active one: route align / cursor queries here.
+  void _activate(int i) {
+    _focus = i;
+    widget.onActive(_paras[i].c);
     widget.onBindAlign(_applyAlign);
+    widget.onBindCursor(_masterCursor);
+  }
+
+  /// Cursor position inside the master text of this block.
+  int _masterCursor() {
+    if (_paras.isEmpty) return 0;
+    final i = _focus.clamp(0, _paras.length - 1);
+    var off = 0;
+    for (var k = 0; k < i; k++) {
+      final p = _paras[k];
+      off += (p.align == 'left' ? 0 : '[align=${p.align}]'.length) + p.c.text.length + 2;
+    }
+    final p = _paras[i];
+    off += p.align == 'left' ? 0 : '[align=${p.align}]'.length;
+    final sel = p.c.selection;
+    off += sel.isValid ? sel.extentOffset.clamp(0, p.c.text.length) : p.c.text.length;
+    return off;
   }
 
   @override
@@ -1428,7 +1474,6 @@ class _ParagraphEditorState extends State<_ParagraphEditor> {
       widget.master.addListener(_onMaster);
       _load(widget.master.text);
     }
-    widget.onBindAlign(_applyAlign);
   }
 
   @override
@@ -1437,6 +1482,7 @@ class _ParagraphEditorState extends State<_ParagraphEditor> {
     for (final p in _paras) {
       p.c.removeListener(_onPara);
       p.c.dispose();
+      p.f.dispose();
     }
     super.dispose();
   }
@@ -1454,10 +1500,22 @@ class _ParagraphEditorState extends State<_ParagraphEditor> {
     }
   }
 
+  _P _newP(String align, TextEditingController c) {
+    final p = _P(align, c);
+    p.f.addListener(() {
+      if (p.f.hasFocus) {
+        final i = _paras.indexOf(p);
+        if (i >= 0) _activate(i);
+      }
+    });
+    return p;
+  }
+
   void _load(String raw) {
     for (final p in _paras) {
       p.c.removeListener(_onPara);
       p.c.dispose();
+      p.f.dispose();
     }
     _paras.clear();
     final chunks = raw.isEmpty ? [''] : raw.split('\n\n');
@@ -1467,7 +1525,7 @@ class _ParagraphEditorState extends State<_ParagraphEditor> {
       final body = m == null ? chunk : chunk.substring(m.end);
       final c = MarkupTextController(text: body);
       c.addListener(_onPara);
-      _paras.add(_P(align, c));
+      _paras.add(_newP(align, c));
     }
     if (_focus >= _paras.length) _focus = _paras.length - 1;
   }
@@ -1497,8 +1555,7 @@ class _ParagraphEditorState extends State<_ParagraphEditor> {
     for (var i = 0; i < _paras.length; i++) {
       final sel = _paras[i].c.selection;
       if (sel.isValid && !sel.isCollapsed) {
-        _focus = i;
-        widget.onActive(_paras[i].c);
+        _activate(i);
       }
     }
     for (var i = 0; i < _paras.length; i++) {
@@ -1511,7 +1568,7 @@ class _ParagraphEditorState extends State<_ParagraphEditor> {
         for (var k = 1; k < parts.length; k++) {
           final c = MarkupTextController(text: parts[k]);
           c.addListener(_onPara);
-          _paras.insert(i + k, _P(_paras[i].align, c));
+          _paras.insert(i + k, _newP(_paras[i].align, c));
         }
         _push();
         setState(() {});
@@ -1574,16 +1631,14 @@ class _ParagraphEditorState extends State<_ParagraphEditor> {
         for (var i = 0; i < _paras.length; i++)
           TextField(
             controller: _paras[i].c,
+            focusNode: _paras[i].f,
             readOnly: widget.readOnly,
             maxLines: null,
             keyboardType: TextInputType.multiline,
             style: widget.style,
             textAlign: _ta(_paras[i].align),
             contextMenuBuilder: _menu,
-            onTap: () {
-              _focus = i;
-              widget.onActive(_paras[i].c);
-            },
+            onTap: () => _activate(i),
             decoration: InputDecoration(
               hintText: i == 0 ? widget.hint : null,
               hintStyle: widget.style.copyWith(color: Colors.black38),

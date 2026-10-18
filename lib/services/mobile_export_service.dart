@@ -12,7 +12,9 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:share_plus/share_plus.dart';
 
 import '../core/book_chrome.dart';
+import '../core/page_layout.dart';
 import '../core/page_size.dart';
+import 'layout_pdf.dart';
 import '../presentation/document_editor_screen/widgets/book_cover_sheet.dart';
 import '../presentation/document_editor_screen/widgets/table_editor_dialog.dart';
 
@@ -25,6 +27,7 @@ class PdfFace {
   static PdfFace? _bask;
   static PdfFace? _lora;
   static PdfFace? _sans;
+  static PdfFace? _naskh;
 
   static Future<pw.Font> _load(String name) async {
     final data = await rootBundle.load('assets/fonts/$name');
@@ -43,6 +46,8 @@ class PdfFace {
       await _load('Lora-Bold.ttf'),
       await _load('Lora-Italic.ttf'),
     );
+    final nr = await _load('NotoNaskhArabic-Regular.ttf');
+    _naskh = PdfFace(nr, await _load('NotoNaskhArabic-Bold.ttf'), nr);
     _sans = PdfFace(
       await _load('DMSans-Regular.ttf'),
       await _load('DMSans-Bold.ttf'),
@@ -52,6 +57,7 @@ class PdfFace {
 
   static PdfFace pick(String family) {
     if (family == 'Lora') return _lora ?? _bask!;
+    if (family == 'NotoNaskhArabic') return _naskh ?? _bask!;
     if (family == 'Roboto' || family == 'Arial' || family == 'DMSans') {
       return _sans ?? _bask!;
     }
@@ -339,9 +345,74 @@ class MobileExportService {
     bool pageFrame = false,
     String pageNumberStyle = 'plain',
     bool bookHeader = false,
+    String textAlign = 'left',
   }) async {
     if (kIsWeb) return;
+    final bytes = await buildLayoutPdf(
+      content: content,
+      settings: LayoutSettings(
+        pageSize: pageSize,
+        landscape: landscape,
+        marginMm: marginMm,
+        fontFamily: fontFamily,
+        fontSize: fontSize,
+        lineHeight: lineHeight,
+        firstLineIndent: firstLineIndent,
+        chapterNewPage: chapterNewPage,
+        showPageNumbers: showPageNumbers,
+        pageNumberPos: pageNumberPos,
+        pageNumberStyle: pageNumberStyle,
+        pageNumberStartPage: pageNumberStartPage,
+        pageNumberStartAt: pageNumberStartAt,
+        headerText: headerText,
+        footerText: footerText,
+        title: title,
+        author: author,
+        subtitle: subtitle,
+        pageBgColor: pageBgColor,
+        pageFrame: pageFrame,
+        textAlign: textAlign,
+      ),
+    );
+    final safe = title.trim().isEmpty ? 'Untitled Document' : title.trim();
+    await _shareBytes(bytes, _safeFileName(safe, 'pdf'), 'application/pdf');
+  }
 
+  /// PDF from the shared page layout (identical to the editor's page view).
+  static Future<Uint8List> buildLayoutPdf({
+    required String content,
+    required LayoutSettings settings,
+  }) async {
+    final doc = await PageLayoutEngine(settings).layout(content);
+    return LayoutPdf.build(doc, title: settings.title);
+  }
+
+  // Previous flow-based exporter, kept for reference; not used.
+  // ignore: unused_element
+  static Future<void> _legacyExportPdf({
+    required String title,
+    required String content,
+    required PageSize pageSize,
+    bool showPageNumbers = true,
+    String pageNumberPos = 'bottom-center',
+    String headerText = '',
+    String footerText = '',
+    String author = '',
+    String subtitle = '',
+    bool firstLineIndent = false,
+    bool chapterNewPage = false,
+    double marginMm = 20,
+    bool landscape = false,
+    int pageNumberStartPage = 1,
+    int pageNumberStartAt = 1,
+    double fontSize = 16,
+    double lineHeight = 1.7,
+    int pageBgColor = 0xFFFFFFFF,
+    String fontFamily = 'Georgia',
+    bool pageFrame = false,
+    String pageNumberStyle = 'plain',
+    bool bookHeader = false,
+  }) async {
     var pageFormat = switch (pageSize) {
       PageSize.a3 => PdfPageFormat.a3,
       PageSize.a5 => PdfPageFormat.a5,
@@ -1071,7 +1142,10 @@ class MobileExportService {
     );
   }
 
-  static pw.Widget _pdfCover(CoverData data, double width, PdfFace face) {
+  static pw.Widget pdfCoverPage(CoverData data, double width, double height) =>
+      _pdfCover(data, width, PdfFace.pick('LibreBaskerville'), height: height);
+
+  static pw.Widget _pdfCover(CoverData data, double width, PdfFace face, {double height = 500}) {
     final t = coverById(data.templateId);
     final title = data.title.trim().isEmpty ? 'Kitabın adı' : data.title.trim();
     final author = data.author.trim().isEmpty ? '' : data.author.trim();
@@ -1322,7 +1396,7 @@ class MobileExportService {
 
     return pw.Container(
       width: width,
-      height: 500,
+      height: height,
       child: pw.Stack(
         children: [
           pw.Positioned(
@@ -1338,7 +1412,7 @@ class MobileExportService {
             right: 0,
             bottom: 0,
             child: pw.CustomPaint(
-              size: PdfPoint(width, 500),
+              size: PdfPoint(width, height),
               painter: (canvas, size) => paintCoverMarks(canvas, size, accent, t.layout),
             ),
           ),

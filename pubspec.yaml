@@ -60,6 +60,11 @@ flutter:
           weight: 700
         - asset: assets/fonts/Lora-Italic.ttf
           style: italic
+    - family: NotoNaskhArabic
+      fonts:
+        - asset: assets/fonts/NotoNaskhArabic-Regular.ttf
+        - asset: assets/fonts/NotoNaskhArabic-Bold.ttf
+          weight: 700
     - family: DMSans
       fonts:
         - asset: assets/fonts/DMSans-Regular.ttf

@@ -1,54 +1,28 @@
 enum PageSize {
-  a4,
-  a3,
-  a5,
-  letter,
-  legal;
+  a4('A4', 595.28, 841.89),
+  a3('A3', 841.89, 1190.55),
+  a5('A5', 419.53, 595.28),
+  b5('B5', 498.90, 708.66),
+  letter('Letter', 612, 792),
+  legal('Legal', 612, 1008),
+  book5x8('5 × 8 in', 360, 576),
+  book55x85('5.5 × 8.5 in', 396, 612),
+  book6x9('6 × 9 in', 432, 648);
 
-  String get label {
-    switch (this) {
-      case PageSize.a4:
-        return 'A4';
-      case PageSize.a3:
-        return 'A3';
-      case PageSize.a5:
-        return 'A5';
-      case PageSize.letter:
-        return 'Letter';
-      case PageSize.legal:
-        return 'Legal';
-    }
-  }
+  const PageSize(this.label, this.widthPt, this.heightPt);
 
-  double get widthPx {
-    switch (this) {
-      case PageSize.a4:
-        return 794.0;
-      case PageSize.a3:
-        return 1123.0;
-      case PageSize.a5:
-        return 559.0;
-      case PageSize.letter:
-        return 816.0;
-      case PageSize.legal:
-        return 816.0;
-    }
-  }
+  final String label;
 
-  double get heightPx {
-    switch (this) {
-      case PageSize.a4:
-        return 1123.0;
-      case PageSize.a3:
-        return 1587.0;
-      case PageSize.a5:
-        return 794.0;
-      case PageSize.letter:
-        return 1056.0;
-      case PageSize.legal:
-        return 1344.0;
-    }
-  }
+  /// Size in PDF points (1/72 inch). The single source of truth.
+  final double widthPt;
+  final double heightPt;
+
+  /// Legacy screen units (96 dpi).
+  double get widthPx => widthPt * 96 / 72;
+  double get heightPx => heightPt * 96 / 72;
+
+  String get mm =>
+      '${(widthPt / 72 * 25.4).round()} × ${(heightPt / 72 * 25.4).round()} mm';
 }
 
 enum PageMargin {

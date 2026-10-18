@@ -55,6 +55,7 @@ class PdfService {
       pageFrame: pageFrame,
       pageNumberStyle: pageNumberStyle,
       bookHeader: bookHeader,
+      textAlign: textAlign,
     );
   }
 }

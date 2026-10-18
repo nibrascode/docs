@@ -27,6 +27,8 @@ import 'package:share_plus/share_plus.dart';
 import '../../l10n/app_localizations.dart';
 import '../../core/page_size.dart';
 import '../../core/book_chrome.dart';
+import '../../core/page_layout.dart';
+import '../../widgets/layout_page_view.dart';
 
 
 
@@ -88,6 +90,64 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
   DocumentSettings _docSettings = DocumentSettings();
   Timer? _autoSaveTimer;
 
+  // Exact page layout (same engine as the PDF export).
+  DocLayout? _layout;
+  Timer? _layoutTimer;
+  String _layoutSig = '';
+  int _layoutGen = 0;
+
+  LayoutSettings _layoutSettings() => LayoutSettings(
+        pageSize: _pageSize,
+        landscape: _docSettings.landscape,
+        marginMm: _docSettings.marginMm,
+        fontFamily: _docSettings.fontFamily,
+        fontSize: _docSettings.fontSize,
+        lineHeight: _docSettings.lineHeight,
+        firstLineIndent: _docSettings.firstLineIndent,
+        chapterNewPage: _docSettings.chapterNewPage,
+        showPageNumbers: _showPageNumbers,
+        pageNumberPos: _docSettings.pageNumberPos,
+        pageNumberStyle: _docSettings.pageNumberStyle,
+        pageNumberStartPage: _docSettings.pageNumberStartPage,
+        pageNumberStartAt: _docSettings.pageNumberStartAt,
+        headerText: _headerText,
+        footerText: _footerText,
+        title: _extractTitle(),
+        author: _docSettings.author,
+        subtitle: _docSettings.subtitle,
+        pageBgColor: _docSettings.pageBgColor,
+        pageFrame: _docSettings.pageFrame,
+        textAlign: _alignment,
+      );
+
+  String _sigOf(LayoutSettings l, String text) => [
+        l.pageSize, l.landscape, l.marginMm, l.fontFamily, l.fontSize, l.lineHeight,
+        l.firstLineIndent, l.chapterNewPage, l.showPageNumbers, l.pageNumberPos,
+        l.pageNumberStyle, l.pageNumberStartPage, l.pageNumberStartAt, l.headerText,
+        l.footerText, l.title, l.author, l.subtitle, l.pageBgColor, l.pageFrame,
+        l.textAlign, text.hashCode, text.length,
+      ].join('|');
+
+  /// Re-runs the page layout shortly after the text or settings change.
+  void _scheduleLayout({bool now = false}) {
+    final settings = _layoutSettings();
+    final text = _bodyCtrl.text;
+    final sig = _sigOf(settings, text);
+    if (sig == _layoutSig) return;
+    _layoutSig = sig;
+    _layoutTimer?.cancel();
+    _layoutTimer = Timer(Duration(milliseconds: now ? 0 : 350), () async {
+      final gen = ++_layoutGen;
+      try {
+        final doc = await PageLayoutEngine(settings).layout(text);
+        if (!mounted || gen != _layoutGen) return;
+        setState(() => _layout = doc);
+      } catch (e) {
+        debugPrint('layout failed: $e');
+      }
+    });
+  }
+
   @override
   void initState() {
     super.initState();
@@ -130,6 +190,7 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
   @override
   void dispose() {
     _autoSaveTimer?.cancel();
+    _layoutTimer?.cancel();
     _titleCtrl.dispose();
     _bodyCtrl.dispose();
     _bodyFocusNode.dispose();
@@ -147,6 +208,7 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
     _pushHistory();
     _checkPageLimit();
     _scheduleAutoSave();
+    _scheduleLayout();
   }
 
   void _pushHistory() {
@@ -540,6 +602,7 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
   }
 
   void _applyStyle(String style) {
+    _syncCursorFromCanvas();
     final text = _bodyCtrl.text;
     final sel = _bodyCtrl.selection;
     final pos = sel.isValid ? sel.start : text.length;
@@ -668,6 +731,7 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
 
 
   void _transformCase(String mode) {
+    _syncCursorFromCanvas();
     final sel = _bodyCtrl.selection;
     if (!sel.isValid || sel.isCollapsed) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1074,7 +1138,28 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
     });
   }
 
+  /// The canvas edits paragraphs in their own controllers; copy its cursor
+  /// into [_bodyCtrl] so "insert at cursor" really inserts at the cursor.
+  void _syncCursorFromCanvas() {
+    final st = _canvasKey.currentState;
+    if (st == null) return;
+    final pos = st.globalCursor();
+    if (pos == null) return;
+    final ser = st.serialized();
+    _applyingHistory = true;
+    if (ser != _bodyCtrl.text) {
+      _bodyCtrl.value = TextEditingValue(
+        text: ser,
+        selection: TextSelection.collapsed(offset: pos.clamp(0, ser.length)),
+      );
+    } else {
+      _bodyCtrl.selection = TextSelection.collapsed(offset: pos.clamp(0, ser.length));
+    }
+    _applyingHistory = false;
+  }
+
   void _insertAtCursor(String snippet) {
+    _syncCursorFromCanvas();
     final text = _bodyCtrl.text;
     final sel = _bodyCtrl.selection;
     final start = sel.isValid ? sel.start : text.length;
@@ -1246,6 +1331,7 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
   bool _pageLimitDialogOpen = false;
 
   Future<void> _checkPageLimit() async {
+    if (!PremiumService.billingEnabled) return; // no limits until billing is live
     // Estimate pages from text length vs page body (same idea as indicator)
     final text = _bodyCtrl.text.isEmpty ? ' ' : _bodyCtrl.text;
     final screenWidth = MediaQuery.of(context).size.width;
@@ -1313,6 +1399,7 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
   }
 
   Future<void> _pickImage() async {
+    _syncCursorFromCanvas();
     final source = await showModalBottomSheet<ImageSource>(
       context: context,
       builder: (ctx) => SafeArea(
@@ -1393,6 +1480,7 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
   }
 
   Future<void> _insertLink() async {
+    _syncCursorFromCanvas();
     final sel = _bodyCtrl.selection;
     var selected = '';
     if (sel.isValid && !sel.isCollapsed) {
@@ -1412,6 +1500,7 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
   }
 
   Future<void> _insertTable({int rows = 3, int cols = 3}) async {
+    _syncCursorFromCanvas();
     // If cursor is inside an existing [TABLE] block → edit it
     final cursor = _bodyCtrl.selection.isValid
         ? _bodyCtrl.selection.start
@@ -1505,6 +1594,7 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
   }
 
   void _insertTableOfContents({int maxLevel = 3, bool ask = true}) {
+    _syncCursorFromCanvas();
     if (ask) {
       _showTocOptions();
       return;
@@ -2027,6 +2117,7 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
   }
 
   Future<void> _insertMarginNote() async {
+    _syncCursorFromCanvas();
     final ctrl = TextEditingController();
     final text = await showDialog<String>(
       context: context,
@@ -2118,6 +2209,7 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
   }
 
   void _insertPart() {
+    _syncCursorFromCanvas();
     final n = RegExp(r'^# (Part|Hissə|Часть) ', multiLine: true)
             .allMatches(_bodyCtrl.text)
             .length +
@@ -2128,6 +2220,7 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
   }
 
   void _insertChapterHeading() {
+    _syncCursorFromCanvas();
     final n = RegExp(r'^# (Chapter|Fəsil|Глава|فصل) ', multiLine: true)
             .allMatches(_bodyCtrl.text)
             .length +
@@ -2143,6 +2236,7 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
   }
 
   void _splitChapterAtCursor() {
+    _syncCursorFromCanvas();
     final cursor = _bodyCtrl.selection.isValid
         ? _bodyCtrl.selection.start
         : _bodyCtrl.text.length;
@@ -2154,6 +2248,7 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
   }
 
   Future<void> _insertFootnote() async {
+    _syncCursorFromCanvas();
     final n = RegExp(r'\[\^(\d+)\]').allMatches(_bodyCtrl.text).length + 1;
     final ctrl = TextEditingController();
     final note = await showDialog<String>(
@@ -3267,20 +3362,7 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
     );
   }
 
-  String _pageSizeDimensions(PageSize size) {
-    switch (size) {
-      case PageSize.a3:
-        return '297×420mm';
-      case PageSize.a4:
-        return '210×297mm';
-      case PageSize.a5:
-        return '148×210mm';
-      case PageSize.letter:
-        return '8.5×11in';
-      case PageSize.legal:
-        return '8.5×14in';
-    }
-  }
+  String _pageSizeDimensions(PageSize size) => size.mm;
 
   /// Part 2: format selection for real — wraps text in markers stored in document.
   void _wrapSelection(String left, String right) {
@@ -3748,7 +3830,12 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
               size: 20,
             ),
             onPressed: _toggleReadingMode,
-            tooltip: 'Reading mode',
+            tooltip: AppLocalizations.of(context).t(
+              az: 'Səhifə görünüşü (PDF kimi)',
+              en: 'Page view (exactly like PDF)',
+              ru: 'Вид страницы (как PDF)',
+              ar: 'عرض الصفحة (مثل PDF)',
+            ),
             padding: const EdgeInsets.all(8),
           ),
           IconButton(
@@ -3785,58 +3872,15 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
 
   Widget _buildPageIndicator(ThemeData theme) {
     final l10n = AppLocalizations.of(context);
-    // Compute dynamic page count from current text
-    final text = _bodyCtrl.text.isEmpty ? ' ' : _bodyCtrl.text;
-    final screenWidth = MediaQuery.of(context).size.width;
-    const horizontalMargin = 16.0;
-    final availableWidth = screenWidth - horizontalMargin * 2;
-    final scale = availableWidth / _pageSize.widthPx;
-    final pageDisplayHeight = _pageSize.heightPx * scale;
-    final pageDisplayWidth = availableWidth;
-    final textPainter = TextPainter(
-      text: TextSpan(
-        text: text,
-        style: GoogleFonts.dmSans(
-          fontSize: 14,
-          fontWeight: _isBold ? FontWeight.w700 : FontWeight.w400,
-          fontStyle: _isItalic ? FontStyle.italic : FontStyle.normal,
-          height: _docSettings.lineHeight,
-        ),
-      ),
-      textDirection: TextDirection.ltr,
-      textAlign: _textAlign,
-    )..layout(maxWidth: pageDisplayWidth - 64);
-    final contentHeight = textPainter.height + 56;
-    final containerHeight = contentHeight < pageDisplayHeight
-        ? pageDisplayHeight
-        : contentHeight;
-    final totalPages = (containerHeight / pageDisplayHeight).ceil().clamp(
-      1,
-      9999,
-    );
-    // Current page: estimate from cursor position
-    final cursorOffset = _bodyCtrl.selection.isValid
-        ? _bodyCtrl.selection.baseOffset
-        : 0;
-    final cursorText = cursorOffset > 0 && cursorOffset <= text.length
-        ? text.substring(0, cursorOffset)
-        : '';
-    final cursorPainter = TextPainter(
-      text: TextSpan(
-        text: cursorText.isEmpty ? ' ' : cursorText,
-        style: GoogleFonts.dmSans(
-          fontSize: 14,
-          fontWeight: _isBold ? FontWeight.w700 : FontWeight.w400,
-          fontStyle: _isItalic ? FontStyle.italic : FontStyle.normal,
-          height: _docSettings.lineHeight,
-        ),
-      ),
-      textDirection: TextDirection.ltr,
-      textAlign: _textAlign,
-    )..layout(maxWidth: pageDisplayWidth - 64);
-    final currentPage = ((cursorPainter.height + 56) / pageDisplayHeight)
-        .ceil()
-        .clamp(1, totalPages);
+    // Real page count from the shared layout engine (same as the PDF).
+    final pages = _layout?.pages ?? const <LPage>[];
+    final totalPages = pages.isEmpty ? 1 : pages.length;
+    final cursorOffset = _bodyCtrl.selection.isValid ? _bodyCtrl.selection.baseOffset : 0;
+    var currentPage = 1;
+    for (var i = 0; i < pages.length; i++) {
+      final lines = pages[i].lines;
+      if (lines.isNotEmpty && lines.first.sourceOffset <= cursorOffset) currentPage = i + 1;
+    }
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
@@ -4167,6 +4211,23 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
   }
 
   Widget _buildEditorBody(ThemeData theme) {
+    _scheduleLayout();
+    if (_readingMode) {
+      final doc = _layout;
+      if (doc == null) return const Center(child: CircularProgressIndicator());
+      return ColoredBox(
+        color: const Color(0xFFE9E6E0),
+        child: LayoutPagesView(
+          doc: doc,
+          onTapLine: (offset) {
+            setState(() => _readingMode = false);
+            final o = offset.clamp(0, _bodyCtrl.text.length);
+            _bodyCtrl.selection = TextSelection.collapsed(offset: o);
+            _bodyFocusNode.requestFocus();
+          },
+        ),
+      );
+    }
     return LayoutBuilder(
       builder: (context, constraints) {
         final avail = constraints.maxWidth - 12;
@@ -4964,6 +5025,47 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
               item(Icons.menu_book_outlined, l10n.t(az: 'Fəsillər', en: 'Chapters', ru: 'Главы', ar: 'الفصول'), 'chapters'),
             ],
           ),
+          group(
+            l10n.t(az: 'Kitab hissələri', en: 'Book parts', ru: 'Части книги', ar: 'أجزاء الكتاب'),
+            [
+              item(Icons.copyright_rounded, l10n.t(az: 'Müəllif hüquqları səhifəsi', en: 'Copyright page', ru: 'Страница авторских прав', ar: 'صفحة الحقوق'), 'copyright'),
+              item(Icons.favorite_border_rounded, l10n.t(az: 'İthaf', en: 'Dedication', ru: 'Посвящение', ar: 'إهداء'), 'dedication'),
+              item(Icons.format_quote_outlined, l10n.t(az: 'Epiqraf', en: 'Epigraph', ru: 'Эпиграф', ar: 'تصدير'), 'epigraph'),
+              item(Icons.article_outlined, l10n.t(az: 'Ön söz', en: 'Preface', ru: 'Предисловие', ar: 'مقدمة'), 'preface'),
+              item(Icons.first_page_rounded, l10n.t(az: 'Proloq', en: 'Prologue', ru: 'Пролог', ar: 'استهلال'), 'prologue'),
+              item(Icons.more_horiz_rounded, l10n.t(az: 'Səhnə ayırıcı (* * *)', en: 'Scene break (* * *)', ru: 'Разрыв сцены (* * *)', ar: 'فاصل مشهد (* * *)'), 'sceneBreak'),
+              item(Icons.last_page_rounded, l10n.t(az: 'Epiloq', en: 'Epilogue', ru: 'Эпилог', ar: 'خاتمة'), 'epilogue'),
+              item(Icons.history_edu_outlined, l10n.t(az: 'Son söz', en: 'Afterword', ru: 'Послесловие', ar: 'كلمة ختامية'), 'afterword'),
+              item(Icons.volunteer_activism_outlined, l10n.t(az: 'Təşəkkür', en: 'Acknowledgements', ru: 'Благодарности', ar: 'شكر وتقدير'), 'acknowledgements'),
+              item(Icons.person_outline_rounded, l10n.t(az: 'Müəllif haqqında', en: 'About the author', ru: 'Об авторе', ar: 'عن المؤلف'), 'aboutAuthor'),
+              item(Icons.translate_rounded, l10n.t(az: 'Lüğət', en: 'Glossary', ru: 'Глоссарий', ar: 'مسرد'), 'glossary'),
+              item(Icons.library_books_outlined, l10n.t(az: 'Biblioqrafiya', en: 'Bibliography', ru: 'Библиография', ar: 'المراجع'), 'bibliography'),
+            ],
+          ),
+          group(
+            l10n.t(az: 'Yazıçı planı', en: 'Writer\'s plan', ru: 'План писателя', ar: 'خطة الكاتب'),
+            [
+              item(Icons.groups_outlined, l10n.t(az: 'Personaj cədvəli', en: 'Characters table', ru: 'Таблица персонажей', ar: 'جدول الشخصيات'), 'cast'),
+              item(Icons.place_outlined, l10n.t(az: 'Məkan cədvəli', en: 'Places table', ru: 'Таблица мест', ar: 'جدول الأماكن'), 'places'),
+              item(Icons.timeline_rounded, l10n.t(az: 'Xronologiya', en: 'Timeline', ru: 'Хронология', ar: 'التسلسل الزمني'), 'timeline'),
+              item(Icons.movie_outlined, l10n.t(az: 'Səhnə cədvəli', en: 'Scenes table', ru: 'Таблица сцен', ar: 'جدول المشاهد'), 'scenes'),
+              item(Icons.view_list_outlined, l10n.t(az: 'Fəsil planı', en: 'Chapter outline', ru: 'План глав', ar: 'مخطط الفصول'), 'outline'),
+              item(Icons.science_outlined, l10n.t(az: 'Tədqiqat qeydləri', en: 'Research notes', ru: 'Исследования', ar: 'ملاحظات البحث'), 'research'),
+              item(Icons.style_outlined, l10n.t(az: 'Səhnə kartı', en: 'Scene card', ru: 'Карточка сцены', ar: 'بطاقة مشهد'), 'sceneCard'),
+              item(Icons.account_tree_outlined, l10n.t(az: 'Üç pərdəli plan', en: 'Three-act outline', ru: 'Трёхактный план', ar: 'مخطط ثلاثي الفصول'), 'acts'),
+              item(Icons.sticky_note_2_outlined, l10n.t(az: 'Kitab qeydləri', en: 'Book notes', ru: 'Заметки книги', ar: 'ملاحظات الكتاب'), 'bookNotes'),
+              item(Icons.manage_search_rounded, l10n.t(az: 'Ad indeksi', en: 'Name index', ru: 'Указатель имён', ar: 'فهرس الأسماء'), 'nameIndex'),
+            ],
+          ),
+          group(
+            l10n.t(az: 'Səhifə', en: 'Page', ru: 'Страница', ar: 'الصفحة'),
+            [
+              item(Icons.border_top_rounded, l10n.t(az: 'Başlıq və altlıq', en: 'Header & footer', ru: 'Колонтитулы', ar: 'الرأس والتذييل'), 'headerFooter'),
+              item(Icons.format_list_numbered_rounded, l10n.t(az: 'Səhifə nömrələri', en: 'Page numbers', ru: 'Номера страниц', ar: 'أرقام الصفحات'), 'pageNumbers'),
+              item(Icons.format_line_spacing_rounded, l10n.t(az: 'Sətir aralığı', en: 'Line spacing', ru: 'Межстрочный интервал', ar: 'تباعد الأسطر'), 'lineSpacing'),
+              item(Icons.crop_free_rounded, l10n.t(az: 'Kənarlar', en: 'Margins', ru: 'Поля', ar: 'الهوامش'), 'margins'),
+            ],
+          ),
           item(
             Icons.search_rounded,
             l10n.t(az: 'Tap və əvəz et', en: 'Find and replace', ru: 'Найти и заменить', ar: 'بحث واستبدال'),
@@ -4976,7 +5078,83 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
   }
 
   void _handleInsertKey(String key) {
+    _syncCursorFromCanvas();
     switch (key) {
+      case 'copyright':
+        _insertCopyright();
+        break;
+      case 'dedication':
+        _insertDedication();
+        break;
+      case 'epigraph':
+        _insertEpigraph();
+        break;
+      case 'preface':
+        _insertPreface();
+        break;
+      case 'prologue':
+        _insertPrologue();
+        break;
+      case 'sceneBreak':
+        _insertSceneBreak();
+        break;
+      case 'epilogue':
+        _insertEpilogue();
+        break;
+      case 'afterword':
+        _insertAfterword();
+        break;
+      case 'acknowledgements':
+        _insertAcknowledgements();
+        break;
+      case 'aboutAuthor':
+        _insertAboutAuthor();
+        break;
+      case 'glossary':
+        _insertGlossary();
+        break;
+      case 'bibliography':
+        _insertBibliography();
+        break;
+      case 'cast':
+        _insertCastTable();
+        break;
+      case 'places':
+        _insertPlacesTable();
+        break;
+      case 'timeline':
+        _insertTimelineTable();
+        break;
+      case 'scenes':
+        _insertSceneTable();
+        break;
+      case 'outline':
+        _insertOutlineTable();
+        break;
+      case 'research':
+        _insertResearchTable();
+        break;
+      case 'sceneCard':
+        _insertSceneCard();
+        break;
+      case 'acts':
+        _insertOutlineActs();
+        break;
+      case 'bookNotes':
+        _showBookNotes();
+        break;
+      case 'nameIndex':
+        _showNameIndex();
+        break;
+      case 'headerFooter':
+        _showHeaderFooterDialog();
+        break;
+      case 'lineSpacing':
+        _showLineSpacingPicker();
+        break;
+      case 'margins':
+        _showMarginsPicker();
+        break;
       case 'image':
         _pickImage();
         break;
