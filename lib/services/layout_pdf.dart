@@ -1,5 +1,6 @@
 // Renders a [DocLayout] into a PDF. Each word is drawn at the exact position
 // the shared layout engine computed, so the PDF matches the on-screen page.
+import '../core/cover_art.dart';
 import 'dart:io';
 import 'dart:typed_data';
 
@@ -140,6 +141,7 @@ String _visual(String word) {
 class LayoutPdf {
   static Future<Uint8List> build(DocLayout doc, {String title = ''}) async {
     await PdfFace.warm();
+    await ArtCoverCache.warm([for (final p in doc.pages) if (p.cover != null) p.cover!.templateId]);
     final pdf = pw.Document(title: title);
     final images = <String, Uint8List>{};
     for (final p in doc.pages) {

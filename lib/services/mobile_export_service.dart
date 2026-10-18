@@ -1,3 +1,4 @@
+import '../core/cover_art.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
@@ -1162,10 +1163,78 @@ class MobileExportService {
     );
   }
 
+  static pw.Widget _pdfArtCover(ArtCover art, CoverData data, double w, double h) {
+    final g = ArtCoverGeometry.of(art.style, w, h,
+        titleScale: data.titleScale <= 0 ? 1 : data.titleScale, title: data.title.trim(), subtitle: data.subtitle.trim());
+    final serif = PdfFace.pick('LibreBaskerville');
+    final sans = PdfFace.pick('DMSans');
+    final title = data.title.trim().isEmpty ? 'Kitabın adı' : data.title.trim();
+    final author = data.author.trim();
+    final sub = data.subtitle.trim();
+    final ink = _pdfC(data.titleColor == 0 ? art.ink : Color(data.titleColor | 0xFF000000));
+    final a = _pdfC(art.accent);
+    final bytes = ArtCoverCache.jpeg[art.id];
+    pw.Widget at(ArtBox b, pw.Widget c) => pw.Positioned(left: b.x, top: b.y, child: pw.SizedBox(width: b.w, height: b.h, child: c));
+    pw.Widget line(ArtBox b, String s, pw.TextStyle st) =>
+        at(b, pw.Center(child: pw.FittedBox(fit: pw.BoxFit.scaleDown, child: pw.Text(s, maxLines: 1, softWrap: false, style: st))));
+    return pw.SizedBox(
+      width: w,
+      height: h,
+      child: pw.Stack(children: [
+        pw.Positioned.fill(
+          child: pw.Container(
+            color: _pdfC(art.bg),
+            child: bytes == null ? null : pw.Image(pw.MemoryImage(bytes), fit: pw.BoxFit.cover, alignment: pw.Alignment.center),
+          ),
+        ),
+        line(g.brand, 'NIBRAS CODE', pw.TextStyle(font: sans.bold, fontSize: g.brandSize, letterSpacing: g.brandSize * 0.3, color: a)),
+        at(
+          g.emblem,
+          pw.Container(
+            alignment: pw.Alignment.center,
+            decoration: pw.BoxDecoration(
+              shape: pw.BoxShape.circle,
+              color: _pdfC(art.bg.withValues(alpha: 0.55)),
+              border: pw.Border.all(color: a, width: g.emblem.w * 0.025),
+            ),
+            child: pw.Text('NC', style: pw.TextStyle(font: serif.bold, fontSize: g.emblem.w * 0.3, letterSpacing: g.emblem.w * 0.02, color: a)),
+          ),
+        ),
+        at(
+          g.title,
+          pw.Center(
+            child: pw.FittedBox(
+              fit: pw.BoxFit.scaleDown,
+              child: pw.SizedBox(
+                width: g.title.w,
+                child: pw.Column(mainAxisSize: pw.MainAxisSize.min, children: [
+                  pw.Text(title, textAlign: pw.TextAlign.center,
+                      style: pw.TextStyle(font: serif.bold, fontSize: g.titleSize, lineSpacing: g.titleSize * 0.25, color: ink)),
+                  if (sub.isNotEmpty) ...[
+                    pw.SizedBox(height: g.titleSize * 0.4),
+                    pw.Text(sub, textAlign: pw.TextAlign.center,
+                        style: pw.TextStyle(font: serif.italic, fontSize: g.titleSize * 0.45, lineSpacing: g.titleSize * 0.13, color: ink)),
+                  ],
+                  pw.SizedBox(height: g.titleSize * 0.5),
+                  pw.Container(width: g.ruleW, height: g.titleSize * 0.03 + 0.4, color: a),
+                ]),
+              ),
+            ),
+          ),
+        ),
+        if (author.isNotEmpty)
+          line(g.author, author, pw.TextStyle(font: sans.regular, fontSize: g.authorSize, letterSpacing: g.authorSize * 0.08, color: ink)),
+        line(g.url, 'NibrasCode.com', pw.TextStyle(font: sans.regular, fontSize: g.urlSize, letterSpacing: g.urlSize * 0.06, color: a)),
+      ]),
+    );
+  }
+
   static pw.Widget pdfCoverPage(CoverData data, double width, double height) =>
       _pdfCover(data, width, PdfFace.pick('LibreBaskerville'), height: height);
 
   static pw.Widget _pdfCover(CoverData data, double width, PdfFace face, {double height = 500}) {
+    final art = artCoverFor(data.templateId);
+    if (art != null) return _pdfArtCover(art, data, width, height);
     final t = coverById(data.templateId);
     final title = data.title.trim().isEmpty ? 'Kitabın adı' : data.title.trim();
     final author = data.author.trim().isEmpty ? '' : data.author.trim();

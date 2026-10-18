@@ -1,3 +1,4 @@
+import '../../../core/cover_art.dart';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -121,7 +122,13 @@ class CoverTemplate {
   });
 }
 
-const coverTemplates = <CoverTemplate>[
+final coverTemplates = <CoverTemplate>[
+  ..._baseCoverTemplates,
+  for (final c in artCovers)
+    CoverTemplate(id: c.templateId, name: c.name, bg: c.bg, fg: c.ink, accent: c.accent, layout: 'nibrasart'),
+];
+
+const _baseCoverTemplates = <CoverTemplate>[
   CoverTemplate(
     id: 'classic',
     name: 'Klassik',
@@ -563,7 +570,20 @@ class CoverPagePreview extends StatelessWidget {
     final sub = data.subtitle.trim();
     final scale = width / 320.0;
     final mul = data.titleScale <= 0 ? 1.0 : data.titleScale;
-    final titleSize = (22 * scale * mul).clamp(11.0, 48.0);
+    var titleSize = (22 * scale * mul).clamp(11.0, 48.0);
+    // Shrink long titles (and a large title scale) until the title fits a
+    // fixed share of the page, so no layout can overflow at any page size.
+    {
+      final maxW = width * 0.62;
+      double hOf(double fs) => (TextPainter(
+            text: TextSpan(text: title, style: _serif(fontSize: fs, fontWeight: FontWeight.w700, height: 1.25)),
+            textDirection: TextDirection.ltr,
+          )..layout(maxWidth: maxW))
+              .height;
+      while (titleSize > 9 && hOf(titleSize) > height * 0.26) {
+        titleSize *= 0.92;
+      }
+    }
     final subSize = (12 * scale).clamp(8.0, 16.0);
     final authSize = (11 * scale).clamp(8.0, 14.0);
     final pad = (22 * scale).clamp(8.0, 36.0);
@@ -584,6 +604,16 @@ class CoverPagePreview extends StatelessWidget {
           subSize: subSize,
           authSize: authSize,
         );
+        break;
+      case 'nibrasart':
+        final art = artCoverFor(template.id);
+        if (art != null) {
+          return GestureDetector(
+            onTap: onTap,
+            child: ArtCoverView(art: art, data: data, width: width, height: height),
+          );
+        }
+        inner = const SizedBox();
         break;
       case 'nibrascode':
         inner = _NibrasCodeCover(
@@ -2115,6 +2145,95 @@ class _NibrasCodeCover extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Artwork cover: full-bleed cover-fit artwork plus the Nibras overlay, placed
+/// by [ArtCoverGeometry] (shared with the PDF exporter).
+class ArtCoverView extends StatelessWidget {
+  final ArtCover art;
+  final CoverData data;
+  final double width;
+  final double height;
+  const ArtCoverView({super.key, required this.art, required this.data, required this.width, required this.height});
+
+  @override
+  Widget build(BuildContext context) {
+    final g = ArtCoverGeometry.of(art.style, width, height,
+        titleScale: data.titleScale <= 0 ? 1 : data.titleScale, title: data.title.trim(), subtitle: data.subtitle.trim());
+    final title = data.title.trim().isEmpty ? 'Kitabın adı' : data.title.trim();
+    final author = data.author.trim();
+    final sub = data.subtitle.trim();
+    final ink = data.titleColor == 0 ? art.ink : Color(data.titleColor | 0xFF000000);
+    final a = art.accent;
+    Widget at(ArtBox b, Widget child) => Positioned(left: b.x, top: b.y, width: b.w, height: b.h, child: child);
+    Widget line(ArtBox b, String s, TextStyle st) => at(
+        b,
+        Center(
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(s, maxLines: 1, softWrap: false, style: st),
+          ),
+        ));
+    const serif = 'LibreBaskerville';
+    const sans = 'DMSans';
+    return SizedBox(
+      width: width,
+      height: height,
+      child: ClipRect(
+        child: Stack(children: [
+          Positioned.fill(
+            child: ColoredBox(
+              color: art.bg,
+              child: Image.asset(art.asset, fit: BoxFit.cover, alignment: Alignment.center,
+                  filterQuality: FilterQuality.medium, errorBuilder: (_, __, ___) => const SizedBox()),
+            ),
+          ),
+          line(g.brand, 'NIBRAS CODE',
+              TextStyle(fontFamily: sans, fontSize: g.brandSize, fontWeight: FontWeight.w700, letterSpacing: g.brandSize * 0.3, color: a)),
+          at(
+            g.emblem,
+            Container(
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: art.bg.withValues(alpha: 0.55),
+                border: Border.all(color: a, width: g.emblem.w * 0.025),
+              ),
+              child: Text('NC',
+                  style: TextStyle(fontFamily: serif, fontWeight: FontWeight.w700, fontSize: g.emblem.w * 0.3, letterSpacing: g.emblem.w * 0.02, color: a, height: 1.0)),
+            ),
+          ),
+          at(
+            g.title,
+            Center(
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: SizedBox(
+                  width: g.title.w,
+                  child: Column(mainAxisSize: MainAxisSize.min, children: [
+                    Text(title,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(fontFamily: serif, fontWeight: FontWeight.w700, fontSize: g.titleSize, height: 1.25, color: ink)),
+                    if (sub.isNotEmpty) ...[
+                      SizedBox(height: g.titleSize * 0.4),
+                      Text(sub,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(fontFamily: serif, fontStyle: FontStyle.italic, fontSize: g.titleSize * 0.45, height: 1.3, color: ink.withValues(alpha: 0.85))),
+                    ],
+                    SizedBox(height: g.titleSize * 0.5),
+                    Container(width: g.ruleW, height: g.titleSize * 0.03 + 0.4, color: a),
+                  ]),
+                ),
+              ),
+            ),
+          ),
+          if (author.isNotEmpty)
+            line(g.author, author, TextStyle(fontFamily: sans, fontSize: g.authorSize, letterSpacing: g.authorSize * 0.08, color: ink)),
+          line(g.url, 'NibrasCode.com', TextStyle(fontFamily: sans, fontSize: g.urlSize, letterSpacing: g.urlSize * 0.06, color: a)),
+        ]),
       ),
     );
   }

@@ -30,6 +30,7 @@ dependencies:
   path_provider: ^2.1.5
   share_plus: ^10.1.4
   pdf: ^3.11.1
+  image: ^4.2.0
   printing: ^5.13.4
   image_picker: ^1.1.2
   file_picker: ^11.0.3
@@ -46,6 +47,7 @@ flutter:
     - assets/
     - assets/images/
     - assets/fonts/
+    - assets/covers/
   fonts:
     - family: LibreBaskerville
       fonts:
