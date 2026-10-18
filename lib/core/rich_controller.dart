@@ -254,6 +254,16 @@ class RichController extends TextEditingController {
         }
       }
     }
+    // Backspace right after a list marker removes the whole marker.
+    if (ins.isEmpty && del == 1 && o.codeUnitAt(a) == 32) {
+      final ls = lineStart(a);
+      final m = _listRe.firstMatch(o.substring(ls, a + 1));
+      if (m != null && m.end == a + 1 - ls) {
+        final n = result.text;
+        _st.removeRange(ls, a);
+        result = TextEditingValue(text: n.substring(0, ls) + n.substring(a), selection: TextSelection.collapsed(offset: ls));
+      }
+    }
     assert(_st.length == result.text.length);
     if (_st.length != result.text.length) {
       // Never let the model drift from the text.

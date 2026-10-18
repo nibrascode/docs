@@ -121,4 +121,35 @@ void main() {
     await settle(t);
     expect(t.takeException(), isNull);
   });
+
+  testWidgets('undo reverts a typed word as one step; formatting is its own step', (t) async {
+    await pumpEditor(t, content: 'Salam');
+    final c = await focusPara(t, 'Salam', const TextSelection.collapsed(offset: 5));
+    Future<void> type(String w, {bool space = true}) async {
+      final start = c.selection.extentOffset;
+      for (var i = 0; i < w.length; i++) {
+        final k = c.selection.extentOffset;
+        t.testTextInput.updateEditingValue(TextEditingValue(
+            text: c.text.replaceRange(k, k, w[i]),
+            selection: TextSelection.collapsed(offset: k + 1),
+            composing: TextRange(start: start, end: k + 1)));
+        await t.pump();
+      }
+      if (space) {
+        final k = c.selection.extentOffset;
+        t.testTextInput.updateEditingValue(
+            TextEditingValue(text: c.text.replaceRange(k, k, ' '), selection: TextSelection.collapsed(offset: k + 1)));
+        await t.pump();
+      }
+    }
+
+    await type(' dünya');
+    await type('gözəl', space: false);
+    expect(c.text, 'Salam dünya gözəl');
+    await t.tap(find.byIcon(Icons.undo_rounded));
+    await settle(t);
+    final c2 = t.widget<TextField>(find.byType(TextField).first).controller!;
+    expect(c2.text, 'Salam dünya ');
+    expect(t.takeException(), isNull);
+  });
 }

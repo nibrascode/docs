@@ -301,7 +301,17 @@ class DocumentCanvasState extends State<DocumentCanvas> {
     return prefix + ed.masterCursor(base: base);
   }
 
+  bool _historyBreak = true;
+
+  /// True once after a formatting/structure action (new undo step).
+  bool takeHistoryBreak() {
+    final b = _historyBreak;
+    _historyBreak = false;
+    return b;
+  }
+
   bool alignFocused(String align) {
+    _historyBreak = true;
     final ed = _activeEd;
     if (ed == null || !ed.mounted) return false;
     ed.applyAlign(align);
@@ -310,11 +320,13 @@ class DocumentCanvasState extends State<DocumentCanvas> {
 
   /// Heading / quote / list / normal on the focused lines (no rebuild).
   bool lineStyleFocused(String id) {
+    _historyBreak = true;
     final ed = _activeEd;
     return ed != null && ed.mounted && ed.applyLineStyle(id);
   }
 
   bool indentFocused(int delta) {
+    _historyBreak = true;
     final ed = _activeEd;
     return ed != null && ed.mounted && ed.indent(delta);
   }
@@ -409,6 +421,7 @@ class DocumentCanvasState extends State<DocumentCanvas> {
   /// Applies formatting to the selection of the focused paragraph, or, with
   /// a bare cursor, to the text typed next. Returns false if nothing is focused.
   bool formatFocused(FormatOp op) {
+    _historyBreak = true;
     final c = _activeCtrl;
     if (c == null) return false;
     try {
@@ -500,6 +513,8 @@ class DocumentCanvasState extends State<DocumentCanvas> {
           final ctrl = _textCtrls[textIndex++];
           children.add(
             _ParagraphEditor(
+              hasPrev: i > 0,
+              hasNext: i < _blocks.length - 1,
               master: ctrl,
               style: widget.style,
               readOnly: widget.readOnly,
@@ -1456,7 +1471,13 @@ class _ParagraphEditor extends StatefulWidget {
   final VoidCallback onColor;
   final bool Function(FormatOp op) onFormat;
 
+  /// A table/image/break sits before/after this block: one leading/trailing
+  /// line break is only a separator, not an empty line.
+  final bool hasPrev, hasNext;
+
   const _ParagraphEditor({
+    this.hasPrev = false,
+    this.hasNext = false,
     required this.master,
     required this.style,
     required this.readOnly,
@@ -1478,10 +1499,23 @@ class _ParagraphEditorState extends State<_ParagraphEditor> {
   bool _writing = false;
   static const _chunk = 4000;
 
+  bool _lead = false, _trail = false;
+
+  List<RLine> _decode(String raw) {
+    var r = raw;
+    _lead = widget.hasPrev && r.startsWith('\n');
+    if (_lead) r = r.substring(1);
+    _trail = widget.hasNext && r.endsWith('\n');
+    if (_trail) r = r.substring(0, r.length - 1);
+    return RichDoc.decode(r);
+  }
+
+  String _encode() => '${_lead ? '\n' : ''}${RichDoc.encode(_allLines())}${_trail ? '\n' : ''}';
+
   @override
   void initState() {
     super.initState();
-    _build(RichDoc.decode(widget.master.text));
+    _build(_decode(widget.master.text));
     widget.master.addListener(_onMaster);
   }
 
@@ -1617,7 +1651,7 @@ class _ParagraphEditorState extends State<_ParagraphEditor> {
       final sel = _gs[_focus].c.selection;
       if (sel.isValid) pos = _global(_focus, sel.extentOffset);
     }
-    _build(RichDoc.decode(raw));
+    _build(_decode(raw));
     if (pos != null) _refocus(pos);
   }
 
@@ -1639,7 +1673,7 @@ class _ParagraphEditorState extends State<_ParagraphEditor> {
     final c = _gs[i].c;
     final off = sel.isValid ? (base ? sel.baseOffset : sel.extentOffset) : c.text.length;
     final (gl, col) = _global(i, off);
-    return RichDoc.rawOffset(_allLines(), gl, col);
+    return (_lead ? 1 : 0) + RichDoc.rawOffset(_allLines(), gl, col);
   }
 
   /// Alignment for the selected lines of the focused field.
@@ -1735,7 +1769,7 @@ class _ParagraphEditorState extends State<_ParagraphEditor> {
 
   void _onMaster() {
     if (_writing) return;
-    if (RichDoc.encode(_allLines()) == widget.master.text) return;
+    if (_encode() == widget.master.text) return;
     setState(() => _reload(widget.master.text));
   }
 
@@ -1753,7 +1787,7 @@ class _ParagraphEditorState extends State<_ParagraphEditor> {
   }
 
   void _push() {
-    final joined = RichDoc.encode(_allLines());
+    final joined = _encode();
     if (joined == widget.master.text) return;
     _writing = true;
     widget.master.text = joined;

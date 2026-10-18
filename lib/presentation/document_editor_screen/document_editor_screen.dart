@@ -213,14 +213,47 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
     _scheduleLayout();
   }
 
+  DateTime _lastHistory = DateTime(2000);
+  bool _historyClosed = true;
+
   void _pushHistory() {
     final text = _bodyCtrl.text;
     if (_undoStack.isNotEmpty && _undoStack.last == text) return;
+    // Group a typing burst (letters of a word) into one undo step, like
+    // Word/Docs: a pause, a space/new line, or a formatting action starts a
+    // new step.
+    final now = DateTime.now();
+    final brk = _canvasKey.currentState?.takeHistoryBreak() ?? true;
+    final prev = _undoStack.isNotEmpty ? _undoStack.last : '';
+    final d = (text.length - prev.length).abs();
+    final typedBoundary = text.length > prev.length && RegExp(r'\s$').hasMatch(_commonInsert(prev, text));
+    final merge = _undoStack.length > 1 && !brk && !_historyClosed && d <= 2 &&
+        now.difference(_lastHistory).inMilliseconds < 1200;
+    _historyClosed = typedBoundary;
+    _lastHistory = now;
+    if (merge) {
+      _undoStack[_undoStack.length - 1] = text;
+      _redoStack.clear();
+      return;
+    }
     _undoStack.add(text);
     if (_undoStack.length > _maxHistory) {
       _undoStack.removeAt(0);
     }
     _redoStack.clear();
+  }
+
+  /// Text inserted between [a] and [b] (common prefix/suffix removed).
+  static String _commonInsert(String a, String b) {
+    var p = 0;
+    while (p < a.length && p < b.length && a.codeUnitAt(p) == b.codeUnitAt(p)) {
+      p++;
+    }
+    var q = 0;
+    while (q < a.length - p && q < b.length - p && a.codeUnitAt(a.length - 1 - q) == b.codeUnitAt(b.length - 1 - q)) {
+      q++;
+    }
+    return b.substring(p, b.length - q);
   }
 
   void _undo() {

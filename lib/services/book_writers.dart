@@ -138,7 +138,9 @@ class DocxWriter {
       body.write('<w:p><w:r><w:br w:type="page"/></w:r></w:p>');
     }
 
-    for (final blk in DocumentBlocks.parse(content)) {
+    final allBlocks = DocumentBlocks.parse(content);
+    for (var bi = 0; bi < allBlocks.length; bi++) {
+      final blk = allBlocks[bi];
       switch (blk.kind) {
         case DocBlockKind.cover:
           final c = CoverData.parse(blk.text);
@@ -209,7 +211,13 @@ class DocxWriter {
           break;
         case DocBlockKind.text:
           String? chunkAlign;
-          for (var line in blk.text.split('\n')) {
+          final lines = blk.text.split('\n');
+          for (var li = 0; li < lines.length; li++) {
+            var line = lines[li];
+            if (line.trim().isEmpty && ((li == 0 && bi > 0) || (li == lines.length - 1 && bi < allBlocks.length - 1))) {
+              chunkAlign = null;
+              continue;
+            }
             final am = _alignRe.firstMatch(line);
             if (am != null) {
               chunkAlign = am.group(1);
@@ -218,6 +226,7 @@ class DocxWriter {
             final t = line.trimRight();
             if (t.trim().isEmpty) {
               chunkAlign = null;
+              body.write('<w:p/>'); // empty line, as in the editor
               continue;
             }
             if (t.startsWith('# ')) {
@@ -229,11 +238,11 @@ class DocxWriter {
             } else if (t.startsWith('### ')) {
               para(t.substring(4), style: 'Heading3');
             } else if (t.startsWith('> ')) {
-              para(t.substring(2), style: 'Quote');
+              para(t.substring(2), style: 'Quote', align: chunkAlign == 'left' ? null : chunkAlign);
             } else if (RegExp(r'^\[\^\d+\]:').hasMatch(t)) {
               para(t, style: 'FootnoteText');
             } else {
-              para(t, align: chunkAlign);
+              para(t, align: chunkAlign == 'left' ? null : chunkAlign);
             }
           }
           break;
@@ -377,7 +386,9 @@ class EpubWriter {
 
     String dir(String s) => isRtlText(s) ? ' dir="rtl"' : (_rtlRe.hasMatch(s) ? ' dir="ltr"' : '');
 
-    for (final blk in DocumentBlocks.parse(content)) {
+    final allBlocks = DocumentBlocks.parse(content);
+    for (var bi = 0; bi < allBlocks.length; bi++) {
+      final blk = allBlocks[bi];
       switch (blk.kind) {
         case DocBlockKind.cover:
           final c = CoverData.parse(blk.text);
@@ -423,7 +434,13 @@ class EpubWriter {
           break;
         case DocBlockKind.text:
           String? chunkAlign;
-          for (var line in blk.text.split('\n')) {
+          final lines = blk.text.split('\n');
+          for (var li = 0; li < lines.length; li++) {
+            var line = lines[li];
+            if (line.trim().isEmpty && ((li == 0 && bi > 0) || (li == lines.length - 1 && bi < allBlocks.length - 1))) {
+              chunkAlign = null;
+              continue;
+            }
             final am = _alignRe.firstMatch(line);
             if (am != null) {
               chunkAlign = am.group(1);
@@ -432,6 +449,7 @@ class EpubWriter {
             final t = line.trimRight();
             if (t.trim().isEmpty) {
               chunkAlign = null;
+              cur.write('<p class="blank">&#160;</p>');
               continue;
             }
             if (t.startsWith('# ')) {
@@ -446,7 +464,7 @@ class EpubWriter {
             } else if (RegExp(r'^\[\^\d+\]:').hasMatch(t)) {
               cur.write('<p class="fn"${dir(t)}>${inline(t)}</p>');
             } else {
-              final st = chunkAlign == null ? '' : ' style="text-align:$chunkAlign"';
+              final st = chunkAlign == null || chunkAlign == 'left' ? '' : ' style="text-align:$chunkAlign"';
               cur.write('<p$st${dir(t)}>${inline(t)}</p>');
             }
           }

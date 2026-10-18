@@ -296,6 +296,11 @@ void main() {
     await h.tapField(0);
     await h.enter();
     expect(h.focused.text, '1. bir\n2. ');
+    // Backspace right after "• " removes the bullet.
+    await h.pump('• ');
+    await h.tapField(0);
+    await h.backspace();
+    expect(h.focused.text, '');
     // Heading on a line: text unchanged, stored as '# '.
     await h.pump('Başlıq\nmətn');
     await h.tapField(0, offset: 2);
@@ -348,10 +353,34 @@ void main() {
     final h = Harness(t);
     await h.pump('');
     await h.tapField(0);
-    await h.typeWord('بسم');
+    await h.typeWord('بِسْمِ');
+    await h.commit(' ');
+    await h.fmt(const FormatOp('bold'));
+    await h.typeWord('اللَّهِ');
     await t.pump();
     expect(h.fields.first.textDirection, TextDirection.rtl);
+    final c = h.focused;
+    expect(c.text, 'بِسْمِ اللَّهِ');
+    expect(c.styles.sublist(0, 7).any((s) => s.bold), isFalse);
+    expect(c.styles.sublist(7).every((s) => s.bold), isTrue);
+    await h.pump(h.saved);
+    expect((h.fields.first.controller! as RichController).styles, c.styles);
     expect(t.takeException(), isNull);
+  });
+
+  testWidgets('Samsung-style composing flaps do not change text or drop pending style', (t) async {
+    final h = Harness(t);
+    await h.pump('abc');
+    await h.tapField(0);
+    await h.fmt(const FormatOp('italic'));
+    for (var i = 0; i < 4; i++) {
+      await h._send(h.v.copyWith(composing: const TextRange(start: 0, end: 3)));
+      await h._send(h.v.copyWith(composing: TextRange.empty));
+    }
+    expect(h.focused.pending?.italic, isTrue);
+    await h.typeWord('d');
+    expect(h.focused.styles.last.italic, isTrue);
+    expect(h.saved, 'abc*d*');
   });
 
   test('layout: every empty line takes a full line (WYSIWYG)', () {

@@ -598,7 +598,9 @@ class PageLayoutEngine {
 
     var offset = 0;
     var firstChapter = true;
-    for (final b in DocumentBlocks.parse(content)) {
+    final allBlocks = DocumentBlocks.parse(content);
+    for (var bi = 0; bi < allBlocks.length; bi++) {
+      final b = allBlocks[bi];
       switch (b.kind) {
         case DocBlockKind.cover:
           final c = CoverData.parse(b.text);
@@ -670,15 +672,18 @@ class PageLayoutEngine {
               chunkAlign = am.group(1);
               t = t.substring(am.end);
             }
-            if (t.trim().isEmpty) {
-              chunkAlign = null;
-              // Blank lines between paragraphs: half-line gap, never at page top.
-              if (pageHasContent) y += lineH(body) * 0.45;
+            if (t.trim().isEmpty && ((li == 0 && bi > 0) || (li == lines.length - 1 && bi < allBlocks.length - 1))) {
+              chunkAlign = null; // line break that only separates this block from a table/image
               continue;
             }
-            if (chunkAlign != null && !t.startsWith('#')) {
-              placePara(para(t, body, here, align: chunkAlign, indentFirst: s.firstLineIndent && chunkAlign == 'justify'));
-            } else if (t.startsWith('# ')) {
+            if (t.trim().isEmpty) {
+              chunkAlign = null;
+              // Every empty line is one full line, exactly as in the editor
+              // (never at the top of a page).
+              if (pageHasContent) y += lineH(body);
+              continue;
+            }
+            if (t.startsWith('# ')) {
               final np = s.chapterNewPage && !firstChapter;
               firstChapter = false;
               placePara(para(t.substring(2), body.copyWith(size: body.size * 1.55, bold: true), here,
@@ -691,7 +696,7 @@ class PageLayoutEngine {
                   before: lineH(body) * 0.5, after: lineH(body) * 0.2));
             } else if (t.startsWith('> ')) {
               placePara(para(t.substring(2), body.copyWith(size: body.size * 0.95, italic: true, color: 0xFF424242), here,
-                  leftIndent: 18, before: 2, after: 2));
+                  align: chunkAlign, leftIndent: 18, before: 2, after: 2));
             } else if (RegExp(r'^\[\^\d+\]:').hasMatch(t)) {
               placePara(para(t, body.copyWith(size: body.size * 0.72), here));
             } else {
@@ -700,8 +705,11 @@ class PageLayoutEngine {
               final lead = RegExp(r'^ +').firstMatch(t)?.group(0)?.length ?? 0;
               final tt = t.substring(lead);
               final isList = RegExp(r'^(•|-|\d+[.)]) ').hasMatch(tt);
+              final a = chunkAlign == 'left' ? null : chunkAlign;
               placePara(para(tt, body, here,
-                  leftIndent: (lead ~/ 2) * 14.0, indentFirst: s.firstLineIndent && lead == 0 && !isList));
+                  align: a,
+                  leftIndent: (lead ~/ 2) * 14.0,
+                  indentFirst: s.firstLineIndent && lead == 0 && !isList && (a == null || a == 'justify')));
             }
           }
           break;
