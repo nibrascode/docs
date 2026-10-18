@@ -35,11 +35,26 @@ Son abzas.[^1]
 [^1]: Dipqeyd nümunəsi.
 ''';
 
+const arabicSample = '''# الفصل الأول
+
+هذا نص عربي كامل لاختبار محرك الصفحات في تطبيق نبراس. يجب أن تتصل الحروف ببعضها وأن تظهر الكلمات من اليمين إلى اليسار، وأن ينتقل السطر في المكان نفسه على الشاشة وفي ملف التصدير. نكتب هنا جملة أطول قليلاً حتى يمتد الفقرة على عدة أسطر.
+
+## عنوان فرعي
+
+بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ
+
+صدر الكتاب عام 2026 في باكو، وهو متوفر بصيغة PDF و EPUB (الإصدار 1.1.0).
+
+النص العربي يجب أن يظهر بنفس الشكل على الشاشة وفي ملف PDF.
+
+Nibras Docs يدعم العربية والأذربيجانية: əşğ.
+''';
+
 void main() {
   testWidgets('page view and PDF use the same layout', (tester) async {
     await tester.runAsync(() async {
       await loadAppFonts();
-      for (final size in [PageSize.a5, PageSize.book6x9]) {
+      for (final (name, size, text) in [('a5', PageSize.a5, sample), ('book6x9', PageSize.book6x9, sample), ('arabic', PageSize.a5, arabicSample)]) {
         final settings = LayoutSettings(
           pageSize: size,
           marginMm: 18,
@@ -49,7 +64,7 @@ void main() {
           firstLineIndent: true,
           headerText: 'Nibras Docs',
         );
-        final doc = await PageLayoutEngine(settings, imageSizer: (_) async => null).layout(sample);
+        final doc = await PageLayoutEngine(settings, imageSizer: (_) async => null).layout(text);
         expect(doc.pages, isNotEmpty);
         // Every word must stay inside the text area.
         for (final p in doc.pages) {
@@ -68,9 +83,9 @@ void main() {
         LayoutPagePainter(doc, doc.pages.first).paint(canvas, Size(settings.pageW * k, settings.pageH * k));
         final img = await rec.endRecording().toImage((settings.pageW * k).round(), (settings.pageH * k).round());
         final png = await img.toByteData(format: ui.ImageByteFormat.png);
-        File('/workspace/docs-shots/compare-${size.name}-screen.png').writeAsBytesSync(png!.buffer.asUint8List());
+        File('/workspace/docs-shots/compare-$name-screen.png').writeAsBytesSync(png!.buffer.asUint8List());
         final pdf = await LayoutPdf.build(doc);
-        File('/workspace/docs-shots/compare-${size.name}.pdf').writeAsBytesSync(pdf);
+        File('/workspace/docs-shots/compare-$name.pdf').writeAsBytesSync(pdf);
       }
     });
   });

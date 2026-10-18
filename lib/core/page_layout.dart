@@ -246,6 +246,9 @@ class PageLayoutEngine {
     r'|\[\^(\d+)\]'
     r'|\[size=(\d+)\]([\s\S]*?)\[/size\]',
   );
+  static final _punctEdges = RegExp(r'^([\(\[«"\u201C]*)(.*?)([\.,;:!\?\)\]»"\u201D\u060C\u061B\u061F]*)$', dotAll: true);
+  static final _digits = RegExp(r'[0-9\u0660-\u0669]');
+  static const _mirror = {0x28: 0x29, 0x29: 0x28, 0x5B: 0x5D, 0x5D: 0x5B, 0xAB: 0xBB, 0xBB: 0xAB};
   static final _strongLtr = RegExp(r'[A-Za-z\u00C0-\u024F\u0259\u018F\u0400-\u04FF]');
   static final _firstStrong = RegExp(r'[A-Za-z\u00C0-\u024F\u0259\u018F\u0400-\u04FF\u0590-\u08FF]');
   static final _alignRe = RegExp(r'^\[align=(left|center|right|justify)\]');
@@ -411,7 +414,8 @@ class PageLayoutEngine {
         if (y + lh > bottom && pageHasContent) newPage();
         final isLast = i >= toks.length;
         // Horizontal placement.
-        final x0 = left + p.leftIndent + (firstLine ? indent : 0);
+        // RTL paragraphs take their indents on the right-hand side.
+        final x0 = p.rtl ? left : left + p.leftIndent + (firstLine ? indent : 0);
         var gap = space;
         var start = x0;
         final spaces = lineGlue.where((g) => !g).length - 1;
@@ -424,6 +428,7 @@ class PageLayoutEngine {
             break;
           case 'justify':
             if (!isLast && spaces > 0) gap = space + (avail - w) / spaces;
+            if (isLast && p.rtl) start = x0 + avail - w;
             break;
           default:
             if (p.rtl) start = x0 + avail - w;
@@ -432,10 +437,46 @@ class PageLayoutEngine {
         // inside a run (e.g. a Latin phrase inside an Arabic paragraph).
         final placed = <LWord>[];
         final paraDir = p.rtl ? 1 : 0;
-        int dirOf(String t) => _arabic.hasMatch(t) ? 1 : (_strongLtr.hasMatch(t) ? 0 : paraDir);
-        final runsIdx = <(int, List<int>)>[];
+        // Split trailing/leading punctuation off words so it can take the
+        // direction of its surroundings (Unicode bidi neutrals), e.g.
+        // "ملف PDF." shows the period at the far left like the editor.
+        final mixed = p.rtl || line.any((t) => _arabic.hasMatch(t.text));
+        final items = <(String, LStyle, double, bool)>[]; // text, style, width, glued
         for (var k = 0; k < line.length; k++) {
-          final d = dirOf(line[k].text);
+          final t = line[k];
+          final m = _punctEdges.firstMatch(t.text);
+          final glue = k > 0 && lineGlue[k];
+          if (!mixed || m == null || (m.group(1)!.isEmpty && m.group(3)!.isEmpty) || m.group(2)!.isEmpty) {
+            items.add((t.text, t.style, t.width, glue));
+            continue;
+          }
+          var first = true;
+          for (final part in [m.group(1)!, m.group(2)!, m.group(3)!]) {
+            if (part.isEmpty) continue;
+            items.add((part, t.style, measure(part, t.style), first ? glue : true));
+            first = false;
+          }
+        }
+        // Resolve directions: 1 rtl, 0 ltr, -1 neutral.
+        final dirs = [
+          for (final it in items) _arabic.hasMatch(it.$1) ? 1 : (_strongLtr.hasMatch(it.$1) ? 0 : -1)
+        ];
+        final neutral = [for (final d in dirs) d == -1];
+        for (var k = 0; k < dirs.length; k++) {
+          if (dirs[k] != -1) continue;
+          var before = paraDir, after = paraDir;
+          for (var j = k - 1; j >= 0; j--) {
+            if (dirs[j] >= 0) { before = dirs[j]; break; }
+          }
+          for (var j = k + 1; j < dirs.length; j++) {
+            if (dirs[j] >= 0) { after = dirs[j]; break; }
+          }
+          dirs[k] = before == after ? before : paraDir;
+        }
+        // Ensure resolved neutrals never feed back as strong for later ones.
+        final runsIdx = <(int, List<int>)>[];
+        for (var k = 0; k < items.length; k++) {
+          final d = dirs[k];
           if (runsIdx.isNotEmpty && runsIdx.last.$1 == d) {
             runsIdx.last.$2.add(k);
           } else {
@@ -446,16 +487,33 @@ class PageLayoutEngine {
         final order = <int>[
           for (final r in visualRuns) ...(r.$1 == 1 ? r.$2.reversed : r.$2),
         ];
+        final vpos = List<int>.filled(order.length, 0);
+        for (var v = 0; v < order.length; v++) {
+          vpos[order[v]] = v;
+        }
+        // A glued item whose logical predecessor ended up elsewhere visually.
+        bool hugs(int g) => items[g].$4 && g > 0 && (vpos[g] - vpos[g - 1]).abs() != 1;
         var x = (p.align == 'justify' && !isLast) ? x0 : start;
         for (var v = 0; v < order.length; v++) {
           final k = order[v];
           if (v > 0) {
             final prev = order[v - 1];
-            final glued = (k - prev).abs() == 1 && lineGlue[k > prev ? k : prev];
+            // Logical neighbours: use their own glue. Visual-only neighbours
+            // (at a direction-run boundary): a split-off punctuation mark
+            // has no space before it, so it hugs the run edge.
+            final glued = (k - prev).abs() == 1
+                ? items[k > prev ? k : prev].$4
+                : (hugs(k) || hugs(prev));
             if (!glued) x += gap;
           }
-          placed.add(LWord(line[k].text, line[k].style, x, line[k].width));
-          x += line[k].width;
+          final it = items[k];
+          var text = it.$1;
+          if (neutral[k] && dirs[k] == 1 && !_digits.hasMatch(text)) {
+            // Neutral run inside RTL: visual order is reversed, brackets mirror.
+            text = String.fromCharCodes(text.runes.toList().reversed.map((r) => _mirror[r] ?? r));
+          }
+          placed.add(LWord(text, it.$2, x, it.$3));
+          x += it.$3;
         }
         // Baseline: centre the font box inside the line box (like CSS).
         final baseline = y + (lh - p.base.size) / 2 + p.base.size * 0.8;

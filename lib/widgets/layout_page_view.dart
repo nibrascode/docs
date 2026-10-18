@@ -47,7 +47,7 @@ class LayoutPagePainter extends CustomPainter {
         final st = w.style;
         final tp = TextPainter(
           text: TextSpan(text: w.text, style: st.toTextStyle()),
-          textDirection: TextDirection.ltr,
+          textDirection: _arabicRe.hasMatch(w.text) ? TextDirection.rtl : TextDirection.ltr,
           maxLines: 1,
         )..layout();
         final ascent = tp.computeDistanceToActualBaseline(TextBaseline.alphabetic);
@@ -175,3 +175,5 @@ class LayoutPagesView extends StatelessWidget {
     });
   }
 }
+
+final _arabicRe = RegExp(r'[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]');

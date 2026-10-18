@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:archive/archive.dart';
@@ -35,6 +36,14 @@ Bu **qalın**, *kursiv* və __altxətli__ mətndir.[^1]
 # İkinci fəsil
 
 Русский абзац. النص العربي هنا.
+
+# الفصل الثالث
+
+هذا **نص عربي** كامل لاختبار التصدير، وتظهر الحروف متصلة.
+
+بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ
+
+صدر الكتاب عام 2026 بصيغة PDF و EPUB (الإصدار 1.1.0).
 
 [^1]: Dipqeyd.
 ''';
@@ -133,6 +142,10 @@ void main() {
     expect(xml, contains('<w:tbl>'));
     expect(xml, contains('<w:pageBreakBefore/>'));
     expect(arc.findFile('word/styles.xml'), isNotNull);
+    expect(xml, contains('<w:bidi/>'));
+    expect(xml, contains('<w:rtl/>'));
+    expect(xml, contains('<w:bCs/>'));
+    expect(RegExp('<w:bidi/>').allMatches(xml).length, greaterThanOrEqualTo(4));
     final back = DocImportService.docxToMarkup(bytes);
     expect(back, contains('# Birinci fəsil'));
     expect(back, contains('**qalın**'));
@@ -145,6 +158,9 @@ void main() {
     final arc = ZipDecoder().decodeBytes(bytes);
     expect(arc.files.first.name, 'mimetype');
     expect(arc.findFile('OEBPS/nav.xhtml'), isNotNull);
+    final rtlCh = arc.files.where((f) => f.name.endsWith('.xhtml')).map((f) => utf8.decode(f.content as List<int>)).firstWhere((x) => x.contains('الفصل الثالث'));
+    expect(rtlCh, contains('<h1 dir="rtl">'));
+    expect(rtlCh, contains('<p dir="rtl">'));
     expect(arc.findFile('OEBPS/ch2.xhtml'), isNotNull);
     expect(arc.findFile('OEBPS/ch3.xhtml'), isNotNull);
   });

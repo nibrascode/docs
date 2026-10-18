@@ -274,21 +274,29 @@ class DocumentCanvasState extends State<DocumentCanvas> {
   TextSelection? _savedSel;
   TextEditingController? _activeCtrl;
   void Function(String align)? _aligner;
-  int Function()? _cursorFn;
+  int Function({bool base})? _cursorFn;
   DocBlock? _cursorBlock;
 
   /// Cursor offset in the full serialized document, or null if no text
   /// paragraph has been focused yet.
   String serialized() => DocumentBlocks.serialize(_blocks);
 
-  int? globalCursor() {
+  /// Selection (base..extent) in serialized-document offsets.
+  TextSelection? globalSelection() {
+    final e = globalCursor();
+    final b = globalCursor(base: true);
+    if (e == null || b == null) return null;
+    return TextSelection(baseOffset: b, extentOffset: e);
+  }
+
+  int? globalCursor({bool base = false}) {
     final fn = _cursorFn;
     final blk = _cursorBlock;
     if (fn == null || blk == null) return null;
     final idx = _blocks.indexOf(blk);
     if (idx < 0) return null;
     final prefix = DocumentBlocks.serialize(_blocks.sublist(0, idx)).length;
-    return prefix + fn();
+    return prefix + fn(base: base);
   }
 
   bool alignFocused(String align) {
@@ -1411,7 +1419,7 @@ class _ParagraphEditor extends StatefulWidget {
   final void Function(void Function(String align) fn) onBindAlign;
   final VoidCallback onColor;
   final bool Function(String left, String right) onWrap;
-  final void Function(int Function() masterCursor) onBindCursor;
+  final void Function(int Function({bool base}) masterCursor) onBindCursor;
 
   const _ParagraphEditor({
     required this.master,
@@ -1453,7 +1461,7 @@ class _ParagraphEditorState extends State<_ParagraphEditor> {
   }
 
   /// Cursor position inside the master text of this block.
-  int _masterCursor() {
+  int _masterCursor({bool base = false}) {
     if (_paras.isEmpty) return 0;
     final i = _focus.clamp(0, _paras.length - 1);
     var off = 0;
@@ -1464,7 +1472,7 @@ class _ParagraphEditorState extends State<_ParagraphEditor> {
     final p = _paras[i];
     off += p.align == 'left' ? 0 : '[align=${p.align}]'.length;
     final sel = p.c.selection;
-    off += sel.isValid ? sel.extentOffset.clamp(0, p.c.text.length) : p.c.text.length;
+    off += sel.isValid ? (base ? sel.baseOffset : sel.extentOffset).clamp(0, p.c.text.length) : p.c.text.length;
     return off;
   }
 

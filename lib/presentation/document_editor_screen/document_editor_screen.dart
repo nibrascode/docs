@@ -18,6 +18,7 @@ import '../../theme/app_theme.dart';
 import '../../services/supabase_service.dart';
 import '../../services/pdf_service.dart';
 import '../../services/book_writers.dart';
+import '../../core/text_case.dart';
 import '../../services/mobile_export_service.dart';
 import '../../services/local_docs_cache.dart';
 import '../../services/template_service.dart';
@@ -739,21 +740,8 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
       );
       return;
     }
-    var s = _bodyCtrl.text.substring(sel.start, sel.end);
-    switch (mode) {
-      case 'upper':
-        s = s.toUpperCase();
-        break;
-      case 'lower':
-        s = s.toLowerCase();
-        break;
-      case 'title':
-        s = s.split(' ').map((w) {
-          if (w.isEmpty) return w;
-          return w[0].toUpperCase() + (w.length > 1 ? w.substring(1).toLowerCase() : '');
-        }).join(' ');
-        break;
-    }
+    final s = TextCase.apply(_bodyCtrl.text.substring(sel.start, sel.end), mode,
+        turkic: AppLocalizations.of(context).locale.languageCode == 'az');
     final newText = _bodyCtrl.text.replaceRange(sel.start, sel.end, s);
     _bodyCtrl.value = TextEditingValue(
       text: newText,
@@ -1143,17 +1131,18 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
   void _syncCursorFromCanvas() {
     final st = _canvasKey.currentState;
     if (st == null) return;
-    final pos = st.globalCursor();
-    if (pos == null) return;
+    final gs = st.globalSelection();
+    if (gs == null) return;
     final ser = st.serialized();
+    final sel = TextSelection(
+      baseOffset: gs.baseOffset.clamp(0, ser.length),
+      extentOffset: gs.extentOffset.clamp(0, ser.length),
+    );
     _applyingHistory = true;
     if (ser != _bodyCtrl.text) {
-      _bodyCtrl.value = TextEditingValue(
-        text: ser,
-        selection: TextSelection.collapsed(offset: pos.clamp(0, ser.length)),
-      );
+      _bodyCtrl.value = TextEditingValue(text: ser, selection: sel);
     } else {
-      _bodyCtrl.selection = TextSelection.collapsed(offset: pos.clamp(0, ser.length));
+      _bodyCtrl.selection = sel;
     }
     _applyingHistory = false;
   }
@@ -3378,6 +3367,7 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
 
   /// Part 2: format selection for real — wraps text in markers stored in document.
   void _wrapSelection(String left, String right) {
+    _syncCursorFromCanvas();
     final sel = _bodyCtrl.selection;
     final text = _bodyCtrl.text;
     if (!sel.isValid) return;
@@ -3784,6 +3774,15 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
           child: Column(
             children: [
               _buildAppBar(theme),
+              if (_focusMode)
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton.icon(
+                    onPressed: _toggleFocusMode,
+                    icon: const Icon(Icons.close_fullscreen_rounded, size: 16),
+                    label: Text(AppLocalizations.of(context).t(az: 'Fokus rejimindən çıx', en: 'Exit focus mode', ru: 'Выйти из режима фокуса', ar: 'الخروج من وضع التركيز')),
+                  ),
+                ),
               if (!_readingMode && !_focusMode) _buildPageIndicator(theme),
               if (!_readingMode && !_focusMode) _buildFormattingToolbar(theme),
               Expanded(child: _buildEditorBody(theme)),
@@ -5070,6 +5069,20 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
             ],
           ),
           group(
+            l10n.t(az: 'Mətn', en: 'Text', ru: 'Текст', ar: 'النص'),
+            [
+              item(Icons.text_increase_rounded, l10n.t(az: 'BÖYÜK HƏRF', en: 'UPPERCASE', ru: 'ПРОПИСНЫЕ', ar: 'أحرف كبيرة'), 'caseUpper'),
+              item(Icons.text_decrease_rounded, l10n.t(az: 'kiçik hərf', en: 'lowercase', ru: 'строчные', ar: 'أحرف صغيرة'), 'caseLower'),
+              item(Icons.title_rounded, l10n.t(az: 'Hər Söz Böyük', en: 'Title Case', ru: 'Каждое Слово', ar: 'كل كلمة بحرف كبير'), 'caseTitle'),
+              item(Icons.format_quote_rounded, l10n.t(az: '«Dırnağa al»', en: 'Wrap in «quotes»', ru: 'В «кавычки»', ar: 'بين «علامتي تنصيص»'), 'wrapQuotes'),
+              item(Icons.data_array_rounded, l10n.t(az: '(Mötərizəyə al)', en: 'Wrap in (brackets)', ru: 'В (скобки)', ar: 'بين (قوسين)'), 'wrapParens'),
+              item(Icons.center_focus_strong_outlined, l10n.t(az: 'Fokus rejimi', en: 'Focus mode', ru: 'Режим фокуса', ar: 'وضع التركيز'), 'focusMode'),
+              item(Icons.refresh_rounded, l10n.t(az: 'Mündəricatı yenilə', en: 'Refresh TOC', ru: 'Обновить оглавление', ar: 'تحديث الفهرس'), 'tocRefresh'),
+              item(Icons.call_split_rounded, l10n.t(az: 'Fəsli kursordan böl', en: 'Split chapter at cursor', ru: 'Разделить главу', ar: 'تقسيم الفصل عند المؤشر'), 'splitChapter'),
+              item(Icons.format_list_numbered_rounded, l10n.t(az: 'Fəsilləri nömrələ', en: 'Renumber chapters', ru: 'Перенумеровать главы', ar: 'إعادة ترقيم الفصول'), 'renumber'),
+            ],
+          ),
+          group(
             l10n.t(az: 'Səhifə', en: 'Page', ru: 'Страница', ar: 'الصفحة'),
             [
               item(Icons.border_top_rounded, l10n.t(az: 'Başlıq və altlıq', en: 'Header & footer', ru: 'Колонтитулы', ar: 'الرأس والتذييل'), 'headerFooter'),
@@ -5217,6 +5230,33 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
         break;
       case 'footnote':
         _insertFootnote();
+        break;
+      case 'caseUpper':
+        _transformCase('upper');
+        break;
+      case 'caseLower':
+        _transformCase('lower');
+        break;
+      case 'caseTitle':
+        _transformCase('title');
+        break;
+      case 'wrapQuotes':
+        _wrapSelection('«', '»');
+        break;
+      case 'wrapParens':
+        _wrapSelection('(', ')');
+        break;
+      case 'focusMode':
+        _toggleFocusMode();
+        break;
+      case 'tocRefresh':
+        _refreshTableOfContents();
+        break;
+      case 'splitChapter':
+        _splitChapterAtCursor();
+        break;
+      case 'renumber':
+        _renumberChapters();
         break;
       default:
         break;

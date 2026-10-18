@@ -19,6 +19,28 @@ String _x(String s) => s
 
 final _alignRe = RegExp(r'^\[align=(left|center|right|justify)\]');
 final _rtlRe = RegExp(r'[\u0590-\u08FF]');
+final _firstStrongRe = RegExp(r'[A-Za-z\u00C0-\u024F\u0259\u018F\u0400-\u04FF\u0590-\u08FF\uFB50-\uFEFF]');
+
+/// Paragraph direction from its first strong letter (Unicode rule P2).
+bool isRtlText(String s) {
+  final m = _firstStrongRe.firstMatch(s);
+  return m != null && _rtlRe.hasMatch(m.group(0)!);
+}
+
+/// Splits text into (segment, isArabic) pieces; spaces/marks between two
+/// Arabic words stay inside the Arabic segment.
+final _arSegRe = RegExp(r'[\u0590-\u08FF\uFB50-\uFEFF]+(?:[\s\u060C\u061B\u061F.,:;!?]+[\u0590-\u08FF\uFB50-\uFEFF]+)*[\u060C\u061B\u061F]?');
+List<(String, bool)> scriptSegments(String t) {
+  final out = <(String, bool)>[];
+  var i = 0;
+  for (final m in _arSegRe.allMatches(t)) {
+    if (m.start > i) out.add((t.substring(i, m.start), false));
+    out.add((m.group(0)!, true));
+    i = m.end;
+  }
+  if (i < t.length) out.add((t.substring(i), false));
+  return out;
+}
 
 const _base = LStyle(family: 'serif', size: 12);
 
@@ -63,21 +85,25 @@ class DocxWriter {
       final b = StringBuffer();
       for (final (t, st) in raw ? [(text, _base)] : PageLayoutEngine.runs(text, _base)) {
         if (t.isEmpty) continue;
-        final pr = StringBuffer();
-        if (st.bold) pr.write('<w:b/>');
-        if (st.italic) pr.write('<w:i/>');
-        if (st.underline) pr.write('<w:u w:val="single"/>');
-        if (st.strike) pr.write('<w:strike/>');
-        if (st.sup) pr.write('<w:vertAlign w:val="superscript"/>');
-        if (st.color != _base.color) {
-          pr.write('<w:color w:val="${(st.color & 0xFFFFFF).toRadixString(16).padLeft(6, '0')}"/>');
+        final hex = (int c) => (c & 0xFFFFFF).toRadixString(16).padLeft(6, '0');
+        for (final (seg, ar) in scriptSegments(t)) {
+          // Child order follows the OOXML schema (CT_RPr sequence).
+          final rp = StringBuffer();
+          if (ar) rp.write('<w:rFonts w:cs="Noto Naskh Arabic"/>');
+          if (st.bold) rp.write(ar ? '<w:b/><w:bCs/>' : '<w:b/>');
+          if (st.italic) rp.write(ar ? '<w:i/><w:iCs/>' : '<w:i/>');
+          if (st.strike) rp.write('<w:strike/>');
+          if (st.color != _base.color) rp.write('<w:color w:val="${hex(st.color)}"/>');
+          if (st.size != _base.size && !st.sup) {
+            final v = (st.size * 2).round();
+            rp.write(ar ? '<w:sz w:val="$v"/><w:szCs w:val="$v"/>' : '<w:sz w:val="$v"/>');
+          }
+          if (st.underline) rp.write('<w:u w:val="single"/>');
+          if (st.bg != 0) rp.write('<w:shd w:val="clear" w:color="auto" w:fill="${hex(st.bg)}"/>');
+          if (st.sup) rp.write('<w:vertAlign w:val="superscript"/>');
+          if (ar) rp.write('<w:rtl/><w:lang w:bidi="ar-SA"/>');
+          b.write('<w:r>${rp.isEmpty ? '' : '<w:rPr>$rp</w:rPr>'}<w:t xml:space="preserve">${_x(seg)}</w:t></w:r>');
         }
-        if (st.bg != 0) {
-          pr.write('<w:shd w:val="clear" w:color="auto" w:fill="${(st.bg & 0xFFFFFF).toRadixString(16).padLeft(6, '0')}"/>');
-        }
-        if (st.size != _base.size && !st.sup) pr.write('<w:sz w:val="${(st.size * 2).round()}"/>');
-        if (_rtlRe.hasMatch(t)) pr.write('<w:rtl/>');
-        b.write('<w:r>${pr.isEmpty ? '' : '<w:rPr>$pr</w:rPr>'}<w:t xml:space="preserve">${_x(t)}</w:t></w:r>');
       }
       return b.toString();
     }
@@ -86,7 +112,7 @@ class DocxWriter {
       final pr = StringBuffer();
       if (style != null) pr.write('<w:pStyle w:val="$style"/>');
       if (pageBreakBefore) pr.write('<w:pageBreakBefore/>');
-      final rtl = _rtlRe.hasMatch(text);
+      final rtl = isRtlText(text);
       if (rtl) pr.write('<w:bidi/>');
       final a = align ?? (style == null ? o.textAlign : null);
       if (a != null && a != 'left') pr.write('<w:jc w:val="${a == 'justify' ? 'both' : a}"/>');
@@ -333,7 +359,7 @@ class EpubWriter {
       curTitle = t;
     }
 
-    String dir(String s) => _rtlRe.hasMatch(s) ? ' dir="rtl"' : '';
+    String dir(String s) => isRtlText(s) ? ' dir="rtl"' : (_rtlRe.hasMatch(s) ? ' dir="ltr"' : '');
 
     for (final blk in DocumentBlocks.parse(content)) {
       switch (blk.kind) {
@@ -445,7 +471,7 @@ class EpubWriter {
         '.title{text-align:center;margin-top:30%}.title h1{page-break-before:avoid}'
         '.cover{text-align:center;padding:12% 8%;min-height:90vh;box-sizing:border-box}.cover .brand{letter-spacing:.3em;font-size:.8em}'
         '.cover .ctitle{page-break-before:avoid;margin-top:35%}.cover .site{margin-top:30%;font-size:.8em}'
-        '[dir=rtl]{text-align:right}'));
+        '[dir=rtl]{text-align:right;font-family:"Amiri","Noto Naskh Arabic","Traditional Arabic",serif}'));
     final titleBody = '<section class="title"><h1>${_x(title)}</h1>'
         '${subtitle.isEmpty ? '' : '<p style="text-align:center"><em>${_x(subtitle)}</em></p>'}'
         '${author.isEmpty ? '' : '<p style="text-align:center">${_x(author)}</p>'}</section>';
