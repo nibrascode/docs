@@ -28,6 +28,7 @@ class _PageCanvas extends pw.Widget {
 
   pw.Font _font(LStyle st) {
     final f = PdfFace.pick(st.family);
+    if (st.bold && st.italic) return f.boldItalic;
     if (st.bold) return f.bold;
     if (st.italic) return f.italic;
     return f.regular;

@@ -24,7 +24,9 @@ class PdfFace {
   final pw.Font regular;
   final pw.Font bold;
   final pw.Font italic;
-  const PdfFace(this.regular, this.bold, this.italic);
+  final pw.Font? _boldItalic;
+  const PdfFace(this.regular, this.bold, this.italic, [this._boldItalic]);
+  pw.Font get boldItalic => _boldItalic ?? bold;
 
   static PdfFace? _bask;
   static PdfFace? _lora;
@@ -42,11 +44,13 @@ class PdfFace {
       await _load('LibreBaskerville-Regular.ttf'),
       await _load('LibreBaskerville-Bold.ttf'),
       await _load('LibreBaskerville-Italic.ttf'),
+      await _load('LibreBaskerville-BoldItalic.ttf'),
     );
     _lora = PdfFace(
       await _load('Lora-Regular.ttf'),
       await _load('Lora-Bold.ttf'),
       await _load('Lora-Italic.ttf'),
+      await _load('Lora-BoldItalic.ttf'),
     );
     final nr = await _load('NotoNaskhArabic-Regular.ttf');
     _naskh = PdfFace(nr, await _load('NotoNaskhArabic-Bold.ttf'), nr);
@@ -54,6 +58,7 @@ class PdfFace {
       await _load('DMSans-Regular.ttf'),
       await _load('DMSans-Bold.ttf'),
       await _load('DMSans-Italic.ttf'),
+      await _load('DMSans-BoldItalic.ttf'),
     );
   }
 
@@ -1173,7 +1178,7 @@ class MobileExportService {
         titleScale: data.titleScale <= 0 ? 1 : data.titleScale, title: data.title.trim(), subtitle: data.subtitle.trim());
     final serif = PdfFace.pick('LibreBaskerville');
     final sans = PdfFace.pick('DMSans');
-    final title = data.title.trim().isEmpty ? 'Kitabın adı' : data.title.trim();
+    final title = data.title.trim().isEmpty ? CoverData.brandTitle : data.title.trim();
     final author = data.author.trim();
     final sub = data.subtitle.trim();
     final ink = _pdfC(data.titleColor == 0 ? art.ink : Color(data.titleColor | 0xFF000000));
@@ -1258,7 +1263,7 @@ class MobileExportService {
     final art = artCoverFor(data.templateId);
     if (art != null) return _pdfArtCover(art, data, width, height);
     final t = coverById(data.templateId);
-    final title = data.title.trim().isEmpty ? 'Kitabın adı' : data.title.trim();
+    final title = data.title.trim().isEmpty ? CoverData.brandTitle : data.title.trim();
     final author = data.author.trim().isEmpty ? '' : data.author.trim();
     final sub = data.subtitle.trim();
     final fg = _pdfC(t.fg);

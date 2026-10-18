@@ -111,7 +111,7 @@ class ArtCoverGeometry {
       return lines * fs * lh;
     }
     double total(double fs) =>
-        est(title.isEmpty ? 'Kitabın adı' : title, fs, 1.3) +
+        est(title.isEmpty ? 'Nibras Code' : title, fs, 1.3) +
         (subtitle.isEmpty ? 0 : fs * 0.4 + est(subtitle, fs * 0.45, 1.35)) +
         fs * 0.55;
     while (ts > 4 && total(ts) > th * 0.92) {

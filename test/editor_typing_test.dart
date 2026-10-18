@@ -7,6 +7,7 @@ import 'package:docspro/core/rich_markup.dart';
 import 'package:docspro/core/page_layout.dart';
 import 'package:docspro/l10n/app_localizations.dart';
 import 'package:docspro/presentation/document_editor_screen/widgets/document_canvas.dart';
+import 'package:docspro/presentation/document_editor_screen/widgets/book_cover_sheet.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -381,6 +382,14 @@ void main() {
     await h.typeWord('d');
     expect(h.focused.styles.last.italic, isTrue);
     expect(h.saved, 'abc*d*');
+  });
+
+  test('cover titles are clean: default Nibras Code, no markup from old versions', () {
+    expect(CoverData.cleanTitle(''), 'Nibras Code');
+    expect(CoverData.cleanTitle('Untitled Document'), 'Nibras Code');
+    expect(CoverData.cleanTitle('[align=center]# **Salam** [color=#B42318]dünya[/color][^1]'), 'Salam dünya');
+    expect(CoverData.cleanTitle('[COVER id=classic title="x"]'), 'Nibras Code');
+    expect(CoverData.parse('[COVER id=classic title="**Kitab**" sub="" author="# Ali" year="" publisher=""]')!.author, 'Ali');
   });
 
   test('layout: every empty line takes a full line (WYSIWYG)', () {

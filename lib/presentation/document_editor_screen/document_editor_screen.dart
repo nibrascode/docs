@@ -2220,11 +2220,10 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
       initial: existing ??
           CoverData(
             templateId: 'classic',
-            title: _extractTitle(),
-            subtitle: _docSettings.subtitle,
-            author: _docSettings.author,
-            year: '${DateTime.now().year}',
-            publisher: _docSettings.publisher,
+            title: CoverData.brandTitle,
+            subtitle: CoverData.cleanText(_docSettings.subtitle),
+            author: CoverData.cleanText(_docSettings.author),
+            publisher: CoverData.cleanText(_docSettings.publisher),
           ),
     );
     if (data == null || !mounted) return;

@@ -1,3 +1,4 @@
+import '../../../core/rich_markup.dart';
 import '../../../core/cover_art.dart';
 import 'dart:math' as math;
 
@@ -77,6 +78,29 @@ class CoverData {
         '$hex ts=${titleScale.toStringAsFixed(2)} tp=$titlePlace]';
   }
 
+  /// Default cover title (the user changes it in the cover editor).
+  static const brandTitle = 'Nibras Code';
+
+  /// Plain text of a cover field: no markup, line prefixes or block tokens
+  /// (older versions copied the first raw line of the document here).
+  static String cleanText(String s) {
+    var t = s.trim();
+    if (RegExp(r'^\[(COVER|img|TABLE|note)').hasMatch(t)) return '';
+    t = t.replaceAll(RegExp(r'\[align=\w+\]'), '');
+    t = t.replaceFirst(RegExp(r'^(#{1,6} |> |[•-] |\d+[.)] )'), '');
+    t = RichMarkup.parse(t).plain;
+    t = t.replaceAll(RegExp(r'\[\^\d+\]'), '').replaceAll(RegExp(r'\s+'), ' ').trim();
+    return t;
+  }
+
+  static const _untitled = {'untitled document', 'untitled', 'adsız sənəd', 'adsız', 'без названия', 'документ без названия', 'مستند بدون عنوان', 'بدون عنوان'};
+
+  static String cleanTitle(String s) {
+    final t = cleanText(s);
+    if (t.isEmpty || _untitled.contains(t.toLowerCase())) return brandTitle;
+    return t.length > 90 ? '${t.substring(0, 90).trimRight()}…' : t;
+  }
+
   static CoverData? parse(String raw) {
     if (!raw.contains('[COVER')) return null;
     String attr(String k) =>
@@ -92,9 +116,9 @@ class CoverData {
         'middle';
     return CoverData(
       templateId: id,
-      title: attr('title'),
-      subtitle: attr('sub'),
-      author: attr('author'),
+      title: cleanTitle(attr('title')),
+      subtitle: cleanText(attr('sub')),
+      author: cleanText(attr('author')),
       year: attr('year'),
       publisher: attr('publisher'),
       titleColor: tc == null ? 0 : int.parse('FF$tc', radix: 16),
@@ -564,9 +588,8 @@ class CoverPagePreview extends StatelessWidget {
         child: SizedBox(width: width, height: height, child: FittedBox(fit: BoxFit.fill, child: design)),
       );
     }
-    final title = data.title.trim().isEmpty ? 'Kitabın adı' : data.title.trim();
-    final author =
-        data.author.trim().isEmpty ? 'Müəllif' : data.author.trim();
+    final title = data.title.trim().isEmpty ? CoverData.brandTitle : data.title.trim();
+    final author = data.author.trim();
     final sub = data.subtitle.trim();
     final scale = width / 320.0;
     final mul = data.titleScale <= 0 ? 1.0 : data.titleScale;
@@ -2163,7 +2186,7 @@ class ArtCoverView extends StatelessWidget {
   Widget build(BuildContext context) {
     final g = ArtCoverGeometry.of(art.style, width, height,
         titleScale: data.titleScale <= 0 ? 1 : data.titleScale, title: data.title.trim(), subtitle: data.subtitle.trim());
-    final title = data.title.trim().isEmpty ? 'Kitabın adı' : data.title.trim();
+    final title = data.title.trim().isEmpty ? CoverData.brandTitle : data.title.trim();
     final author = data.author.trim();
     final sub = data.subtitle.trim();
     final ink = data.titleColor == 0 ? art.ink : Color(data.titleColor | 0xFF000000);

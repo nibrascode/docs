@@ -56,12 +56,18 @@ flutter:
           weight: 700
         - asset: assets/fonts/LibreBaskerville-Italic.ttf
           style: italic
+        - asset: assets/fonts/LibreBaskerville-BoldItalic.ttf
+          weight: 700
+          style: italic
     - family: Lora
       fonts:
         - asset: assets/fonts/Lora-Regular.ttf
         - asset: assets/fonts/Lora-Bold.ttf
           weight: 700
         - asset: assets/fonts/Lora-Italic.ttf
+          style: italic
+        - asset: assets/fonts/Lora-BoldItalic.ttf
+          weight: 700
           style: italic
     - family: NotoNaskhArabic
       fonts:
@@ -74,4 +80,7 @@ flutter:
         - asset: assets/fonts/DMSans-Bold.ttf
           weight: 700
         - asset: assets/fonts/DMSans-Italic.ttf
+          style: italic
+        - asset: assets/fonts/DMSans-BoldItalic.ttf
+          weight: 700
           style: italic
