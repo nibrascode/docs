@@ -975,78 +975,76 @@ class DocumentCanvasState extends State<DocumentCanvas> {
       }
     }
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 12),
-      child: Column(
-        children: [
-          Align(
-            alignment: al,
-            child: Stack(
-              clipBehavior: Clip.none,
-              children: [
-                GestureDetector(
-                  onTap: manage,
-                  onLongPress: manage,
-                  child: f.existsSync()
-                      ? Image.file(
-                          f,
-                          width: MediaQuery.of(context).size.width *
-                              b.imageWidth *
-                              0.72,
-                          fit: BoxFit.contain,
-                        )
-                      : Container(
-                          height: 80,
-                          alignment: Alignment.center,
-                          color: const Color(0xFFEEF1F8),
-                          child: Text(l10n.t(
-                            az: 'Şəkil tapılmadı',
-                            en: 'Image not found',
-                            ru: 'Изображение не найдено',
-                            ar: 'الصورة غير موجودة',
-                          )),
-                        ),
-                ),
-                if (!widget.readOnly)
-                  Positioned(
-                    top: 6,
-                    right: 6,
-                    child: Material(
-                      color: const Color(0xFF0D1B3E),
-                      shape: const CircleBorder(),
-                      elevation: 2,
-                      child: InkWell(
-                        customBorder: const CircleBorder(),
-                        onTap: manage,
-                        child: const Padding(
-                          padding: EdgeInsets.all(8),
-                          child: Icon(
-                            Icons.key_rounded,
-                            size: 16,
-                            color: Color(0xFFC9A84C),
+    // Same box as the page engine / PDF: width = text width × w, aligned,
+    // 6pt below, caption at 80 % italic centred.
+    final k = widget.pxPerPt;
+    return LayoutBuilder(
+      key: ValueKey('img-$index'),
+      builder: (context, cons) {
+        final w = cons.maxWidth * b.imageWidth.clamp(0.2, 1.0);
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Align(
+              alignment: al,
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  GestureDetector(
+                    onTap: manage,
+                    onLongPress: manage,
+                    child: f.existsSync()
+                        ? Image.file(f, key: ValueKey('img-file-$index'), width: w, fit: BoxFit.contain)
+                        : Container(
+                            width: w,
+                            height: 80,
+                            alignment: Alignment.center,
+                            color: const Color(0xFFEEF1F8),
+                            child: Text(l10n.t(
+                              az: 'Şəkil tapılmadı',
+                              en: 'Image not found',
+                              ru: 'Изображение не найдено',
+                              ar: 'الصورة غير موجودة',
+                            )),
+                          ),
+                  ),
+                  if (!widget.readOnly)
+                    Positioned(
+                      top: 6,
+                      right: 6,
+                      child: Material(
+                        color: const Color(0xFF0D1B3E),
+                        shape: const CircleBorder(),
+                        elevation: 2,
+                        child: InkWell(
+                          customBorder: const CircleBorder(),
+                          onTap: manage,
+                          child: const Padding(
+                            padding: EdgeInsets.all(8),
+                            child: Icon(Icons.key_rounded, size: 16, color: Color(0xFFC9A84C)),
                           ),
                         ),
                       ),
                     ),
-                  ),
-              ],
-            ),
-          ),
-          if (b.imageCaption.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.only(top: 6),
-              child: Text(
-                b.imageCaption,
-                style: GoogleFonts.dmSans(
-                  fontSize: 12,
-                  fontStyle: FontStyle.italic,
-                  color: Colors.black54,
-                ),
-                textAlign: TextAlign.center,
+                ],
               ),
             ),
-        ],
-      ),
+            SizedBox(height: 6 * k),
+            if (b.imageCaption.isNotEmpty)
+              Padding(
+                padding: EdgeInsets.only(bottom: 6 * k),
+                child: Text(
+                  b.imageCaption,
+                  style: widget.style.copyWith(
+                    fontSize: (widget.style.fontSize ?? 14) * 0.8,
+                    fontStyle: FontStyle.italic,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+          ],
+        );
+      },
     );
   }
 }

@@ -227,4 +227,22 @@ void main() {
     expect(noteBox.width, closeTo(textW, 0.5));
     expect(find.text('*   *   *'), findsOneWidget);
   });
+
+  testWidgets('image: same width, alignment and caption as the PDF', (t) async {
+    const path = 'test/fixtures_img.png';
+    for (final (w, align) in [(0.5, 'right'), (0.85, 'center'), (0.3, 'left')]) {
+      final text = 'A.\n[img path="$path" w=$w align=$align caption="Şəkil 1"]\nB.';
+      final doc = (await t.runAsync(() => PageLayoutEngine(settings, imageSizer: (_) async => const Size(200, 100)).layout(text)))!;
+      final im = doc.pages.first.images.single;
+      expect(im.w, closeTo((settings.pageW - settings.margin * 2) * w, 0.01));
+      final cap = doc.pages.first.lines.firstWhere((l) => l.words.first.text == 'Şəkil');
+      expect(cap.words.first.style.italic, isTrue);
+      await pumpCanvas(t, text);
+      final box = t.getRect(find.byKey(const ValueKey('img-0')));
+      final img = t.getRect(find.byKey(const ValueKey('img-file-0')));
+      expect(img.width, closeTo(im.w * k, 0.6), reason: '$w');
+      expect(img.left - box.left, closeTo((im.x - settings.margin) * k, 0.6), reason: align);
+      expect(find.text('Şəkil 1'), findsOneWidget);
+    }
+  });
 }
