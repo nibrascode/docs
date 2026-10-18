@@ -2191,6 +2191,23 @@ class ArtCoverView extends StatelessWidget {
                   filterQuality: FilterQuality.medium, errorBuilder: (_, __, ___) => const SizedBox()),
             ),
           ),
+          if (art.plaque) ...[
+            for (final b in [g.pill(g.brand, 11 * 1.3, g.brandSize), g.pill(g.url, 14, g.urlSize)])
+              at(
+                  b,
+                  DecoratedBox(
+                      decoration: BoxDecoration(
+                          color: art.bg.withValues(alpha: 0.72),
+                          borderRadius: BorderRadius.circular(b.h / 2),
+                          border: Border.all(color: a.withValues(alpha: 0.7), width: g.brandSize * 0.06)))),
+            at(
+                g.plaqueBox,
+                DecoratedBox(
+                    decoration: BoxDecoration(
+                        color: art.bg.withValues(alpha: 0.80),
+                        borderRadius: BorderRadius.circular(g.plaqueBox.w * 0.03),
+                        border: Border.all(color: a.withValues(alpha: 0.85), width: g.brandSize * 0.08)))),
+          ],
           line(g.brand, 'NIBRAS CODE',
               TextStyle(fontFamily: sans, fontSize: g.brandSize, fontWeight: FontWeight.w700, letterSpacing: g.brandSize * 0.3, color: a)),
           at(

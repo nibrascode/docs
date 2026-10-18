@@ -11,7 +11,7 @@ import 'package:image/image.dart' as img;
 class ArtCover {
   final String id;
   final String name;
-  final String style; // border, shamsa, corners, field, headfoot
+  final String style; // border, shamsa, corners, field, headfoot, plaque
   final bool light;
   final Color bg;
   final Color ink;
@@ -20,6 +20,10 @@ class ArtCover {
 
   String get asset => 'assets/covers/$id.webp';
   String get templateId => 'art_$id';
+
+  /// AI-generated artwork whose ornament may run under the text: the overlay
+  /// sits on translucent panels so the title stays readable.
+  bool get plaque => style == 'plaque';
 }
 
 /// Rectangle in page units.
@@ -56,6 +60,7 @@ class ArtCoverGeometry {
     'corners': [0.07, 0.175, 0.085, 0.16, 0.33, 0.84, 0.65, 0.71, 0.93],
     'field': [0.085, 0.19, 0.085, 0.15, 0.34, 0.85, 0.65, 0.71, 0.915],
     'headfoot': [0.262, 0.33, 0.07, 0.13, 0.395, 0.87, 0.655, 0.70, 0.745],
+    'plaque': [0.075, 0.205, 0.085, 0.19, 0.335, 0.81, 0.635, 0.705, 0.925],
   };
 
   factory ArtCoverGeometry.of(String style, double w, double h,
@@ -126,6 +131,24 @@ class ArtCoverGeometry {
   }
 
   ArtBox get page => ArtBox(0, 0, pageW, pageH);
+
+  /// Readability panel behind title + author ('plaque' style). Stays inside
+  /// the page's safe area.
+  ArtBox get plaqueBox {
+    final pad = title.w * 0.07;
+    final x0 = (title.x - pad).clamp(pageW * 0.04, pageW);
+    final x1 = (title.right + pad).clamp(0.0, pageW * 0.96);
+    final y0 = (title.y - pad).clamp(pageH * 0.03, pageH);
+    final y1 = (author.bottom + pad * 0.6).clamp(0.0, url.y - pad * 0.3);
+    return ArtBox(x0, y0, x1 - x0, y1 - y0);
+  }
+
+  /// Small pill behind a single overlay line (brand / URL).
+  ArtBox pill(ArtBox line, double chars, double size) {
+    final w = (chars * size * 0.72 + size * 2.4).clamp(0.0, line.w);
+    final h = size * 2.0;
+    return ArtBox(line.cx - w / 2, line.cy - h / 2, w, h);
+  }
   List<ArtBox> get boxes => [brand, emblem, title, author, url];
 }
 
@@ -175,6 +198,10 @@ const artCovers = <ArtCover>[
   ArtCover('noir_linen_hex', 'Nibras gecə kətan · ulduz haşiyə', 'border', false, Color(0xFF1A1A1D), Color(0xFFF3E6C4), Color(0xFFE2BF63)),
   ArtCover('emerald_silk_corners', 'Nibras zümrüd ipək · künc', 'corners', false, Color(0xFF1D4537), Color(0xFFF3E6C4), Color(0xFFE2BF63)),
   ArtCover('navy_linen_star_emboss', 'Nibras lacivərd kətan · kabartma', 'field', false, Color(0xFF1D2B4D), Color(0xFFF3E6C4), Color(0xFFE2BF63)),
+  ArtCover('nibras_ai_01', 'Nibras premium naxış №1', 'plaque', false, Color(0xFF331E20), Color(0xFFF3E6C4), Color(0xFFE2BF63)),
+  ArtCover('nibras_ai_02', 'Nibras premium naxış №2', 'plaque', false, Color(0xFF2B2822), Color(0xFFF3E6C4), Color(0xFFE2BF63)),
+  ArtCover('nibras_ai_03', 'Nibras premium naxış №3', 'plaque', false, Color(0xFF29341D), Color(0xFFF3E6C4), Color(0xFFE2BF63)),
+  ArtCover('nibras_ai_04', 'Nibras premium naxış №4', 'plaque', false, Color(0xFF232E2D), Color(0xFFF3E6C4), Color(0xFFE2BF63)),
   ArtCover('bordeaux_suede_star', 'Nibras bordo zamşa · ulduz haşiyə', 'border', false, Color(0xFF4B1424), Color(0xFFF3E6C4), Color(0xFFE2BF63)),
 ];
 

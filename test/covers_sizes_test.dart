@@ -53,6 +53,19 @@ void main() {
     expect(bad, isEmpty, reason: bad.take(20).join('\n'));
   });
 
+  test('plaque (AI artwork) covers: readability panels stay on the page and behind title/author', () {
+    expect(artCovers.where((c) => c.plaque), isNotEmpty);
+    for (final e in _sizes.entries) {
+      final w = e.value.width, h = e.value.height;
+      final g = ArtCoverGeometry.of('plaque', w, h, titleScale: 1.8, title: _long.title, subtitle: _long.subtitle);
+      final p = g.plaqueBox;
+      expect(p.x >= 0 && p.right <= w && p.y >= 0 && p.bottom <= h, isTrue, reason: '${e.key}: $p');
+      expect(p.bottom <= g.url.y, isTrue, reason: '${e.key}: plaque over url');
+      if (e.key.contains('landscape')) continue; // order is not asserted for landscape (see above)
+      expect(p.y <= g.title.y && p.bottom >= g.author.bottom - 0.5, isTrue, reason: '${e.key}: $p');
+    }
+  });
+
   for (final name in ['A3', 'A4', 'A5']) {
     testWidgets('every cover renders at $name without overflow', (tester) async {
       await tester.runAsync(loadAppFonts);

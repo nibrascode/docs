@@ -1163,6 +1163,11 @@ class MobileExportService {
     );
   }
 
+  static PdfColor _pdfCA(Color color, double alpha) {
+    final c = _pdfC(color);
+    return PdfColor(c.red, c.green, c.blue, alpha);
+  }
+
   static pw.Widget _pdfArtCover(ArtCover art, CoverData data, double w, double h) {
     final g = ArtCoverGeometry.of(art.style, w, h,
         titleScale: data.titleScale <= 0 ? 1 : data.titleScale, title: data.title.trim(), subtitle: data.subtitle.trim());
@@ -1187,6 +1192,23 @@ class MobileExportService {
             child: bytes == null ? null : pw.Image(pw.MemoryImage(bytes), fit: pw.BoxFit.cover, alignment: pw.Alignment.center),
           ),
         ),
+        if (art.plaque) ...[
+          for (final b in [g.pill(g.brand, 11 * 1.3, g.brandSize), g.pill(g.url, 14, g.urlSize)])
+            at(
+                b,
+                pw.Container(
+                    decoration: pw.BoxDecoration(
+                        color: _pdfCA(art.bg, 0.72),
+                        borderRadius: pw.BorderRadius.circular(b.h / 2),
+                        border: pw.Border.all(color: _pdfCA(art.accent, 0.7), width: g.brandSize * 0.06)))),
+          at(
+              g.plaqueBox,
+              pw.Container(
+                  decoration: pw.BoxDecoration(
+                      color: _pdfCA(art.bg, 0.80),
+                      borderRadius: pw.BorderRadius.circular(g.plaqueBox.w * 0.03),
+                      border: pw.Border.all(color: _pdfCA(art.accent, 0.85), width: g.brandSize * 0.08)))),
+        ],
         line(g.brand, 'NIBRAS CODE', pw.TextStyle(font: sans.bold, fontSize: g.brandSize, letterSpacing: g.brandSize * 0.3, color: a)),
         at(
           g.emblem,
