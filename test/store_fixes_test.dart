@@ -223,5 +223,11 @@ void main() {
       final lib = Directory('lib').listSync(recursive: true).whereType<File>().map((f) => f.readAsStringSync()).join();
       expect(lib, isNot(contains('permission_handler')));
     });
+
+    test('single-ABI APK drops other ABIs\' plugin libraries', () {
+      final g = File('android/app/build.gradle.kts').readAsStringSync();
+      expect(g, contains('findProperty("target-platform")'));
+      expect(g, contains('excludes += "lib/\$abi/**"'));
+    });
   });
 }

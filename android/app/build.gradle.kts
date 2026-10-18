@@ -48,6 +48,16 @@ android {
     packaging {
         jniLibs {
             useLegacyPackaging = true
+            // Single-ABI builds (flutter build apk --target-platform android-arm64)
+            // must not carry plugin .so files for other ABIs, or a 32-bit phone
+            // would install the arm64 APK and crash without libflutter.so.
+            // (Flutter's plugin resets ndk.abiFilters, so exclude at packaging.)
+            val abiMap = mapOf("android-arm" to "armeabi-v7a", "android-arm64" to "arm64-v8a", "android-x64" to "x86_64")
+            val targets = (project.findProperty("target-platform") as String?)
+                ?.split(",")?.mapNotNull { abiMap[it.trim()] }.orEmpty()
+            if (targets.isNotEmpty()) {
+                for (abi in abiMap.values - targets.toSet()) excludes += "lib/$abi/**"
+            }
         }
     }
 
