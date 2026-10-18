@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import '../../../core/rich_markup.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -363,44 +364,56 @@ class DocumentCanvasState extends State<DocumentCanvas> {
     _emit();
   }
 
-  /// Bold / italic / color only on the text the user selected.
+  /// Marker pair → formatting operation (kept for older call sites).
+  static FormatOp? opForMarkers(String left) {
+    switch (left) {
+      case '**':
+        return const FormatOp('bold');
+      case '*':
+        return const FormatOp('italic');
+      case '__':
+        return const FormatOp('underline');
+      case '~~':
+        return const FormatOp('strike');
+    }
+    final m = RegExp(r'^\[(color|bg|size|font)=([^\]]+)\]$').firstMatch(left);
+    if (m == null) return null;
+    final v = m.group(2)!;
+    return switch (m.group(1)) {
+      'size' => FormatOp('size', int.tryParse(v)),
+      'color' || 'bg' => FormatOp(m.group(1)!, v.toUpperCase()),
+      _ => FormatOp('font', v),
+    };
+  }
+
   bool wrapFocused(String left, String right) {
-    final c = _activeCtrl ??
-        ((_focusTextIndex != null && _focusTextIndex! < _textCtrls.length)
-            ? _textCtrls[_focusTextIndex!]
-            : null);
-    if (c == null) return false;
-    var sel = c.selection;
-    if (!sel.isValid || sel.isCollapsed) {
-      sel = _savedSel ?? sel;
+    final op = opForMarkers(left);
+    return op != null && formatFocused(op);
+  }
+
+  /// Applies formatting to the selection of the focused paragraph, or, with
+  /// a bare cursor, to the text typed next. Returns false if nothing is focused.
+  bool formatFocused(FormatOp op) {
+    final c = _activeCtrl;
+    if (c is! MarkupTextController) return false;
+    final sel = c.selection;
+    if (!sel.isValid) return false;
+    if (sel.isCollapsed) {
+      final cur = c.caretStyle();
+      c.pending = op.readsToggle() && op.value == null ? op.apply(cur, on: !op.has(cur)) : op.apply(cur);
+      MarkupTextController.caret.value = c.pending!;
+      return true;
     }
-    if (!sel.isValid || sel.isCollapsed) return false;
-    var start = sel.start.clamp(0, c.text.length);
-    var end = sel.end.clamp(0, c.text.length);
-    if (end < start) {
-      final t = start;
-      start = end;
-      end = t;
-    }
-    final selected = c.text.substring(start, end);
-    String next;
-    if (selected.startsWith(left) &&
-        selected.endsWith(right) &&
-        selected.length >= left.length + right.length) {
-      next = selected.substring(left.length, selected.length - right.length);
-    } else {
-      next = '$left$selected$right';
-    }
-    c.value = TextEditingValue(
-      text: c.text.replaceRange(start, end, next),
-      selection: TextSelection(
-        baseOffset: start,
-        extentOffset: start + next.length,
-      ),
-    );
-    _savedSel = c.selection;
-    _onText();
+    final (raw, ns) = RichMarkup.applyRange(c.text, sel, op);
+    c.setRaw(TextEditingValue(text: raw, selection: ns));
+    MarkupTextController.caret.value = c.caretStyle();
     return true;
+  }
+
+  /// Style at the focused caret (for toolbar highlighting).
+  SpanStyle caretStyle() {
+    final c = _activeCtrl;
+    return c is MarkupTextController ? c.caretStyle() : SpanStyle.plain;
   }
 
   Future<void> _colorMenu() async {
@@ -1533,7 +1546,7 @@ class _ParagraphEditorState extends State<_ParagraphEditor> {
       final m = _alignRe.firstMatch(chunk);
       final align = m?.group(1) ?? 'left';
       final body = m == null ? chunk : chunk.substring(m.end);
-      final c = MarkupTextController(text: body);
+      final c = MarkupTextController(text: body)..richTyping = true;
       c.addListener(_onPara);
       _paras.add(_newP(align, c));
     }
@@ -1573,10 +1586,11 @@ class _ParagraphEditorState extends State<_ParagraphEditor> {
       if (t.contains('\n\n')) {
         final parts = t.split('\n\n');
         _paras[i].c.removeListener(_onPara);
-        _paras[i].c.text = parts.first;
+        (_paras[i].c as MarkupTextController).setRaw(
+            TextEditingValue(text: parts.first, selection: TextSelection.collapsed(offset: parts.first.length)));
         _paras[i].c.addListener(_onPara);
         for (var k = 1; k < parts.length; k++) {
-          final c = MarkupTextController(text: parts[k]);
+          final c = MarkupTextController(text: parts[k])..richTyping = true;
           c.addListener(_onPara);
           _paras.insert(i + k, _newP(_paras[i].align, c));
         }
@@ -1600,7 +1614,23 @@ class _ParagraphEditorState extends State<_ParagraphEditor> {
     return AdaptiveTextSelectionToolbar.buttonItems(
       anchors: editable.contextMenuAnchors,
       buttonItems: [
-        ...editable.contextMenuButtonItems,
+        for (final it in editable.contextMenuButtonItems)
+          if (it.type == ContextMenuButtonType.copy || it.type == ContextMenuButtonType.cut)
+            ContextMenuButtonItem(
+              type: it.type,
+              onPressed: () async {
+                final c = editable.widget.controller;
+                final v = c.value;
+                ContextMenuController.removeAny();
+                await RichClipboard.copy(v.text, v.selection);
+                if (it.type == ContextMenuButtonType.cut && c is MarkupTextController) {
+                  final (raw, caret) = RichMarkup.deleteRange(v.text, v.selection);
+                  c.setRaw(TextEditingValue(text: raw, selection: TextSelection.collapsed(offset: caret)));
+                }
+              },
+            )
+          else
+            it,
         ContextMenuButtonItem(
           label: l10n.t(az: 'Rəng', en: 'Color', ru: 'Цвет', ar: 'لون'),
           onPressed: () {
@@ -1668,19 +1698,66 @@ class _ParagraphEditorState extends State<_ParagraphEditor> {
 }
 
 class MarkupTextController extends TextEditingController {
-  MarkupTextController({super.text});
+  MarkupTextController({String? text})
+      : _base = text ?? '',
+        super(text: text);
 
-  static final _inline = RegExp(
-    r'\[color=(#[0-9A-Fa-f]{6,8})\]([\s\S]*?)\[/color\]'
-    r'|\[bg=(#[0-9A-Fa-f]{6,8})\]([\s\S]*?)\[/bg\]'
-    r'|\*\*(.+?)\*\*'
-    r'|__(.+?)__'
-    r'|~~(.+?)~~'
-    r'|\*(.+?)\*'
-    r'|\[\^(\d+)\]',
-  );
+  /// Style at the caret of the focused paragraph (drives toolbar state).
+  static final caret = ValueNotifier<SpanStyle>(SpanStyle.plain);
 
-  static final _tag = _inline;
+  /// When true (paragraph editors), user edits are reconciled with the span
+  /// model so typed text inherits formatting and pending styles apply.
+  bool richTyping = false;
+
+  /// Style for the next typed text when the cursor has no selection.
+  SpanStyle? pending;
+
+  String _base;
+  bool _internal = false;
+
+  /// Programmatic update that bypasses reconciliation.
+  void setRaw(TextEditingValue v) {
+    _internal = true;
+    super.value = v;
+    _internal = false;
+    _base = v.text;
+  }
+
+  SpanStyle caretStyle() {
+    if (pending != null) return pending!;
+    final p = RichMarkup.parse(text);
+    final sel = selection;
+    if (!sel.isValid) return SpanStyle.plain;
+    if (!sel.isCollapsed) {
+      final a = p.plainAt(sel.start);
+      return a < p.length ? p.st[a] : p.styleAt(a);
+    }
+    return p.styleAt(p.plainAt(sel.extentOffset));
+  }
+
+  @override
+  set value(TextEditingValue nv) {
+    if (_internal || !richTyping) {
+      super.value = nv;
+      _base = nv.text;
+      return;
+    }
+    final composing = nv.composing.isValid && !nv.composing.isCollapsed;
+    if (nv.text == _base) {
+      if (nv.selection != selection && nv.text == text) pending = null;
+      super.value = nv;
+      caret.value = caretStyle();
+      return;
+    }
+    if (composing || !nv.selection.isValid) {
+      super.value = nv; // keep _base: reconcile once the word is committed
+      return;
+    }
+    final fixed = RichMarkup.reconcile(_base, nv, pending, clip: RichClipboard.last);
+    super.value = fixed ?? nv;
+    _base = super.value.text;
+    caret.value = caretStyle();
+  }
 
   static Color? _hex(String? s) {
     if (s == null || s.isEmpty) return null;
@@ -1696,108 +1773,106 @@ class MarkupTextController extends TextEditingController {
     color: Colors.transparent,
   );
 
+  static String? fontFamilyFor(String? f) => switch (f) {
+        null => null,
+        'Lora' => 'Lora',
+        'LibreBaskerville' => 'LibreBaskerville',
+        'DMSans' || 'Sans' => 'DMSans',
+        'NotoNaskhArabic' || 'Naskh' => 'NotoNaskhArabic',
+        _ => f,
+      };
+
   @override
   TextSpan buildTextSpan({
     required BuildContext context,
     TextStyle? style,
     required bool withComposing,
   }) {
-    final base = style ?? const TextStyle(fontSize: 16, color: const Color(0xFF1A1A1A));
-    final lines = text.split('\n');
+    final base = style ?? const TextStyle(fontSize: 16, color: Color(0xFF1A1A1A));
+    final fs = base.fontSize ?? 16;
+    final p = RichMarkup.parse(text);
     final children = <InlineSpan>[];
-    for (var i = 0; i < lines.length; i++) {
-      var line = lines[i];
-      var lineStyle = base;
+    // Line styles.
+    final lineStyles = <TextStyle>[];
+    final hides = <int>[];
+    for (final line in text.split('\n')) {
+      var ls = base;
       var hide = 0;
-      final fs = base.fontSize ?? 16;
       if (line.startsWith('### ')) {
         hide = 4;
-        lineStyle = base.copyWith(fontSize: fs * 1.05, fontWeight: FontWeight.w700, height: 1.25);
+        ls = base.copyWith(fontSize: fs * 1.05, fontWeight: FontWeight.w700, height: 1.25);
       } else if (line.startsWith('## ')) {
         hide = 3;
-        lineStyle = base.copyWith(fontSize: fs * 1.22, fontWeight: FontWeight.w700, height: 1.25);
+        ls = base.copyWith(fontSize: fs * 1.22, fontWeight: FontWeight.w700, height: 1.25);
       } else if (line.startsWith('# ')) {
         hide = 2;
-        lineStyle = base.copyWith(fontSize: fs * 1.55, fontWeight: FontWeight.w700, height: 1.2);
+        ls = base.copyWith(fontSize: fs * 1.55, fontWeight: FontWeight.w700, height: 1.2);
       } else if (line.startsWith('> ')) {
         hide = 2;
-        lineStyle = base.copyWith(fontStyle: FontStyle.italic, color: const Color(0xFF424242));
+        ls = base.copyWith(fontStyle: FontStyle.italic, color: const Color(0xFF424242));
       } else if (RegExp(r'^\[\^\d+\]:').hasMatch(line)) {
-        lineStyle = base.copyWith(
-          fontSize: fs * 0.72,
-          height: 1.25,
-          color: const Color(0xFF333333),
-        );
+        ls = base.copyWith(fontSize: fs * 0.72, height: 1.25, color: const Color(0xFF333333));
       }
-      if (hide > 0 && hide <= line.length) {
-        children.add(TextSpan(text: line.substring(0, hide), style: _hidden));
-        line = line.substring(hide);
-      }
-      children.addAll(_inlineSpans(line, lineStyle));
-      if (i < lines.length - 1) {
-        children.add(TextSpan(text: '\n', style: lineStyle));
-      }
+      lineStyles.add(ls);
+      hides.add(hide);
     }
-    return TextSpan(style: base, children: children);
-  }
-
-  List<InlineSpan> _inlineSpans(String src, TextStyle style) {
-    if (!_inline.hasMatch(src)) {
-      return [TextSpan(text: src, style: style)];
+    var line = 0, lineStart = 0, raw = 0;
+    void hidden(int upto) {
+      if (upto > raw) children.add(TextSpan(text: text.substring(raw, upto), style: _hidden));
+      raw = upto;
     }
-    final children = <InlineSpan>[];
-    var cursor = 0;
-    for (final m in _inline.allMatches(src)) {
-      if (m.start > cursor) {
-        children.add(TextSpan(text: src.substring(cursor, m.start), style: style));
-      }
-      void hideWrap(String open, String inner, TextStyle st) {
-        children.add(TextSpan(text: open, style: _hidden));
-        children.add(TextSpan(text: inner, style: st));
-        children.add(TextSpan(text: open, style: _hidden));
-      }
 
-      if (m.group(1) != null) {
-        children.add(TextSpan(text: '[color=${m.group(1)}]', style: _hidden));
-        children.add(TextSpan(
-          text: m.group(2) ?? '',
-          style: style.copyWith(color: _hex(m.group(1))),
-        ));
-        children.add(const TextSpan(text: '[/color]', style: _hidden));
-      } else if (m.group(3) != null) {
-        children.add(TextSpan(text: '[bg=${m.group(3)}]', style: _hidden));
-        children.add(TextSpan(
-          text: m.group(4) ?? '',
-          style: style.copyWith(backgroundColor: _hex(m.group(3))),
-        ));
-        children.add(const TextSpan(text: '[/bg]', style: _hidden));
-      } else if (m.group(5) != null) {
-        hideWrap('**', m.group(5)!, style.copyWith(fontWeight: FontWeight.w700));
-      } else if (m.group(6) != null) {
-        hideWrap('__', m.group(6)!, style.copyWith(decoration: TextDecoration.underline));
-      } else if (m.group(7) != null) {
-        hideWrap('~~', m.group(7)!, style.copyWith(decoration: TextDecoration.lineThrough));
-      } else if (m.group(8) != null) {
-        hideWrap('*', m.group(8)!, style.copyWith(fontStyle: FontStyle.italic));
-      } else if (m.group(9) != null) {
-        final fs = style.fontSize ?? 16;
+    for (var k = 0; k < p.length; k++) {
+      final rs = p.rs[k];
+      hidden(rs);
+      final e = p.el[k];
+      if (e == '\n') {
+        children.add(TextSpan(text: '\n', style: lineStyles[line]));
+        raw = p.re[k];
+        line++;
+        lineStart = raw;
+        continue;
+      }
+      final ls = lineStyles[line];
+      if (rs - lineStart < hides[line]) {
+        children.add(TextSpan(text: e, style: _hidden));
+        raw = p.re[k];
+        continue;
+      }
+      if (p.isFootnote(k)) {
         children.add(const TextSpan(text: '[^', style: _hidden));
         children.add(TextSpan(
-          text: m.group(9),
-          style: style.copyWith(
-            fontSize: fs * 0.62,
-            fontWeight: FontWeight.w700,
-            color: const Color(0xFF8C1C13),
-            height: 1,
-          ),
+          text: e.substring(2, e.length - 1),
+          style: ls.copyWith(fontSize: fs * 0.62, fontWeight: FontWeight.w700, color: const Color(0xFF8C1C13), height: 1),
         ));
         children.add(const TextSpan(text: ']', style: _hidden));
+        raw = p.re[k];
+        continue;
       }
-      cursor = m.end;
+      final sp = p.st[k];
+      final deco = <TextDecoration>[
+        if (sp.underline) TextDecoration.underline,
+        if (sp.strike) TextDecoration.lineThrough,
+      ];
+      final ts = ls.copyWith(
+        fontWeight: sp.bold ? FontWeight.w700 : null,
+        fontStyle: sp.italic ? FontStyle.italic : null,
+        decoration: deco.isEmpty ? null : TextDecoration.combine(deco),
+        color: _hex(sp.color),
+        backgroundColor: _hex(sp.bg),
+        fontSize: sp.size?.toDouble(),
+        fontFamily: fontFamilyFor(sp.font),
+      );
+      // Merge with the previous span when the style is identical.
+      if (children.isNotEmpty && children.last is TextSpan && (children.last as TextSpan).style == ts) {
+        final last = children.removeLast() as TextSpan;
+        children.add(TextSpan(text: (last.text ?? '') + e, style: ts));
+      } else {
+        children.add(TextSpan(text: e, style: ts));
+      }
+      raw = p.re[k];
     }
-    if (cursor < src.length) {
-      children.add(TextSpan(text: src.substring(cursor), style: style));
-    }
-    return children;
+    hidden(text.length);
+    return TextSpan(style: base, children: children);
   }
 }

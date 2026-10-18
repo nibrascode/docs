@@ -14,13 +14,15 @@ import '../presentation/document_editor_screen/widgets/book_cover_sheet.dart';
 import '../presentation/document_editor_screen/widgets/document_canvas.dart';
 import 'book_chrome.dart';
 import 'page_size.dart';
+import 'rich_markup.dart';
 
 const double kPtPerMm = 72 / 25.4;
 
 /// Maps the user's font choice to a bundled family (same TTF in app and PDF).
 String layoutFamily(String userFamily) => switch (userFamily) {
       'Lora' => 'Lora',
-      'Roboto' || 'Arial' || 'DMSans' => 'DMSans',
+      'NotoNaskhArabic' || 'Naskh' => 'NotoNaskhArabic',
+      'Roboto' || 'Arial' || 'DMSans' || 'Sans' => 'DMSans',
       _ => 'LibreBaskerville',
     };
 
@@ -236,16 +238,6 @@ class PageLayoutEngine {
 
   PageLayoutEngine(this.s, {this.imageSizer = defaultImageSizer});
 
-  static final _inline = RegExp(
-    r'\[color=(#[0-9A-Fa-f]{6,8})\]([\s\S]*?)\[/color\]'
-    r'|\[bg=(#[0-9A-Fa-f]{6,8})\]([\s\S]*?)\[/bg\]'
-    r'|\*\*(.+?)\*\*'
-    r'|__(.+?)__'
-    r'|~~(.+?)~~'
-    r'|\*(.+?)\*'
-    r'|\[\^(\d+)\]'
-    r'|\[size=(\d+)\]([\s\S]*?)\[/size\]',
-  );
   static final _punctEdges = RegExp(r'^([\(\[«"\u201C]*)(.*?)([\.,;:!\?\)\]»"\u201D\u060C\u061B\u061F]*)$', dotAll: true);
   static final _digits = RegExp(r'[0-9\u0660-\u0669]');
   static const _mirror = {0x28: 0x29, 0x29: 0x28, 0x5B: 0x5D, 0x5D: 0x5B, 0xAB: 0xBB, 0xBB: 0xAB};
@@ -286,34 +278,51 @@ class PageLayoutEngine {
   }
 
   /// Splits a line into styled runs (markup removed).
+  /// Shared inline parser (same model as the editor: rich_markup.dart).
   static List<(String, LStyle)> runs(String src, LStyle st) {
+    final p = RichMarkup.parse(src);
     final out = <(String, LStyle)>[];
-    var cur = 0;
-    for (final m in _inline.allMatches(src)) {
-      if (m.start > cur) out.add((src.substring(cur, m.start), st));
-      if (m.group(1) != null) {
-        out.addAll(runs(m.group(2)!, st.copyWith(color: _hex(m.group(1)))));
-      } else if (m.group(3) != null) {
-        out.addAll(runs(m.group(4)!, st.copyWith(bg: _hex(m.group(3)))));
-      } else if (m.group(5) != null) {
-        out.addAll(runs(m.group(5)!, st.copyWith(bold: true)));
-      } else if (m.group(6) != null) {
-        out.addAll(runs(m.group(6)!, st.copyWith(underline: true)));
-      } else if (m.group(7) != null) {
-        out.addAll(runs(m.group(7)!, st.copyWith(strike: true)));
-      } else if (m.group(8) != null) {
-        out.addAll(runs(m.group(8)!, st.copyWith(italic: true)));
-      } else if (m.group(10) != null) {
-        final px = double.tryParse(m.group(10)!) ?? 16;
-        out.addAll(runs(m.group(11)!, st.copyWith(size: (px * 0.75).clamp(6.0, 60.0))));
-      } else if (m.group(9) != null) {
-        out.add((m.group(9)!, st.copyWith(size: st.size * 0.62, bold: true, sup: true, color: 0xFF8C1C13)));
-      }
-      cur = m.end;
+    final buf = StringBuffer();
+    LStyle? cur;
+    void flush() {
+      if (buf.isNotEmpty && cur != null) out.add((buf.toString(), cur!));
+      buf.clear();
     }
-    if (cur < src.length) out.add((src.substring(cur), st));
+
+    for (var k = 0; k < p.length; k++) {
+      final sp = p.st[k];
+      LStyle ls;
+      String text = p.el[k];
+      if (p.isFootnote(k)) {
+        text = text.substring(2, text.length - 1);
+        ls = st.copyWith(size: st.size * 0.62, bold: true, sup: true, color: 0xFF8C1C13);
+      } else {
+        ls = st.copyWith(
+          bold: st.bold || sp.bold,
+          italic: st.italic || sp.italic,
+          underline: st.underline || sp.underline,
+          strike: st.strike || sp.strike,
+          color: _hex(sp.color),
+          bg: _hex(sp.bg),
+          size: sp.size == null ? null : (sp.size! * 0.75).clamp(6.0, 60.0),
+        );
+        if (sp.font != null) ls = ls.withFamily(layoutFamily(sp.font!));
+      }
+      if (cur != null && _same(cur, ls)) {
+        buf.write(text);
+      } else {
+        flush();
+        cur = ls;
+        buf.write(text);
+      }
+    }
+    flush();
     return out;
   }
+
+  static bool _same(LStyle a, LStyle b) =>
+      a.family == b.family && a.size == b.size && a.bold == b.bold && a.italic == b.italic &&
+      a.underline == b.underline && a.strike == b.strike && a.color == b.color && a.bg == b.bg && a.sup == b.sup;
 
   /// Tokenises runs into words (spaces are separators, not tokens).
   /// Words glued to the previous one (style change mid-word) are kept as

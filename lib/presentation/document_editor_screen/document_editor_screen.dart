@@ -19,6 +19,7 @@ import '../../services/supabase_service.dart';
 import '../../services/pdf_service.dart';
 import '../../services/book_writers.dart';
 import '../../core/text_case.dart';
+import '../../core/rich_markup.dart';
 import '../../services/mobile_export_service.dart';
 import '../../services/local_docs_cache.dart';
 import '../../services/template_service.dart';
@@ -1184,7 +1185,7 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
         '#${color.toARGB32().toRadixString(16).padLeft(8, '0').substring(2).toUpperCase()}';
     final open = background ? '[bg=$hex]' : '[color=$hex]';
     final close = background ? '[/bg]' : '[/color]';
-    if (_canvasKey.currentState?.wrapFocused(open, close) == true) {
+    if (_canvasKey.currentState?.formatFocused(FormatOp(background ? 'bg' : 'color', hex)) == true) {
       setState(() {
         _hasUnsavedChanges = true;
         _isSaved = false;
@@ -1236,6 +1237,10 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
     final sel = _bodyCtrl.selection;
     final text = _bodyCtrl.text;
     final sz = size.round().clamp(10, 48);
+    if (_canvasKey.currentState?.formatFocused(FormatOp('size', sz)) ?? false) {
+      _markDirty();
+      return;
+    }
     if (!sel.isValid || sel.isCollapsed) {
       setState(() => _fontSize = size);
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1276,6 +1281,10 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
   }
 
   void _clearSelectionFormat() {
+    if (_canvasKey.currentState?.formatFocused(const FormatOp('clear')) ?? false) {
+      _markDirty();
+      return;
+    }
     final sel = _bodyCtrl.selection;
     if (!sel.isValid || sel.isCollapsed) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1307,6 +1316,13 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
     setState(() {
       _readingMode = !_readingMode;
       if (_readingMode) _focusMode = false;
+    });
+  }
+
+  void _markDirty() {
+    setState(() {
+      _hasUnsavedChanges = true;
+      _isSaved = false;
     });
   }
 
@@ -2813,9 +2829,9 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
         content: source,
         pageSize: _pageSize,
         textAlign: _alignment,
-        isBold: _isBold,
-        isItalic: _isItalic,
-        isUnderline: _isUnderline,
+        isBold: false, // inline formatting lives in the text itself
+        isItalic: false,
+        isUnderline: false,
         showPageNumbers: _showPageNumbers,
         pageNumberPos: _docSettings.pageNumberPos,
         headerText: _headerText,
@@ -3649,8 +3665,11 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
   }
 
   void _onFormatTap(String format) {
-    bool wrap(String l, String r) =>
-        _canvasKey.currentState?.wrapFocused(l, r) ?? false;
+    bool wrap(String l, String r) {
+      final ok = _canvasKey.currentState?.wrapFocused(l, r) ?? false;
+      if (ok) _markDirty();
+      return ok;
+    }
     void needSel() {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -3659,7 +3678,7 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
             en: 'Select text first',
             ru: 'Сначала выделите текст',
             ar: 'حدد النص أولاً',
-          )),
+          ).replaceAll('Əvvəl mətni seçin', 'Əvvəl mətnə toxunun və ya mətni seçin')),
           duration: const Duration(seconds: 2),
         ),
       );
@@ -3691,9 +3710,11 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
         _setParagraphAlign('justify');
         break;
       case 'bullet':
+      case 'bullet-list':
         _applyStyle('bullet');
         break;
       case 'number':
+      case 'numbered-list':
         _applyStyle('number');
         break;
       case 'indent-more':
@@ -3991,21 +4012,17 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
             scrollDirection: Axis.horizontal,
             child: Row(
               children: [
-                _fmtBtn('B', 'bold', _isBold, theme, isBold: true),
-                _fmtBtn('I', 'italic', _isItalic, theme, isItalic: true),
-                _fmtBtn(
-                  'U',
-                  'underline',
-                  _isUnderline,
-                  theme,
-                  isUnderline: true,
-                ),
-                _fmtBtn(
-                  'S',
-                  'strikethrough',
-                  _isStrikethrough,
-                  theme,
-                  isStrikethrough: true,
+                ValueListenableBuilder<SpanStyle>(
+                  valueListenable: MarkupTextController.caret,
+                  builder: (_, cs, __) => Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _fmtBtn('B', 'bold', cs.bold, theme, isBold: true),
+                      _fmtBtn('I', 'italic', cs.italic, theme, isItalic: true),
+                      _fmtBtn('U', 'underline', cs.underline, theme, isUnderline: true),
+                      _fmtBtn('S', 'strikethrough', cs.strike, theme, isStrikethrough: true),
+                    ],
+                  ),
                 ),
                 _divider(),
                 _fmtGroup(
@@ -4594,17 +4611,10 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
 
   Widget _buildFontStyleSheet(BuildContext ctx, ThemeData theme) {
     final l10n = AppLocalizations.of(ctx);
-    final fonts = [
-      'Roboto',
-      'Times New Roman',
-      'Arial',
-      'Georgia',
-      'Verdana',
-      'Calibri',
-      'Montserrat',
-      'Lora',
-    ];
-    int selectedFont = fonts.indexOf(_fontFamily);
+    // Bundled families: what you pick is exactly what the PDF uses.
+    final fonts = ['Lora', 'LibreBaskerville', 'DMSans', 'NotoNaskhArabic'];
+    final fontNames = ['Lora', 'Libre Baskerville', 'DM Sans', 'Noto Naskh Arabic'];
+    int selectedFont = fonts.indexOf(_canvasKey.currentState?.caretStyle().font ?? '');
     if (selectedFont < 0) selectedFont = 0;
     double fontSize = _fontSize;
     int tab = 0; // 0 fonts, 1 size, 2 style
@@ -4683,8 +4693,8 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
                       itemCount: fonts.length,
                       itemBuilder: (_, i) => ListTile(
                         title: Text(
-                          fonts[i],
-                          style: GoogleFonts.dmSans(fontSize: 15),
+                          fontNames[i],
+                          style: TextStyle(fontFamily: fonts[i], fontSize: 16),
                         ),
                         trailing: i == selectedFont
                             ? Icon(Icons.check_rounded,
@@ -4692,7 +4702,11 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
                             : null,
                         onTap: () {
                           setS(() => selectedFont = i);
-                          setState(() => _fontFamily = fonts[i]);
+                          if (_canvasKey.currentState?.formatFocused(FormatOp('font', fonts[i])) ?? false) {
+                            _markDirty();
+                          } else {
+                            setState(() => _fontFamily = fonts[i]);
+                          }
                         },
                       ),
                     )
@@ -4746,7 +4760,7 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
                               value: bold,
                               onChanged: (v) {
                                 setS(() => bold = v);
-                                setState(() => _isBold = v);
+                                if (_canvasKey.currentState?.formatFocused(FormatOp('bold', v)) ?? false) _markDirty();
                               },
                             ),
                             SwitchListTile(
@@ -4754,7 +4768,7 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
                               value: italic,
                               onChanged: (v) {
                                 setS(() => italic = v);
-                                setState(() => _isItalic = v);
+                                if (_canvasKey.currentState?.formatFocused(FormatOp('italic', v)) ?? false) _markDirty();
                               },
                             ),
                             SwitchListTile(
@@ -4762,7 +4776,7 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
                               value: underline,
                               onChanged: (v) {
                                 setS(() => underline = v);
-                                setState(() => _isUnderline = v);
+                                if (_canvasKey.currentState?.formatFocused(FormatOp('underline', v)) ?? false) _markDirty();
                               },
                             ),
                             ListTile(

@@ -21,6 +21,14 @@ final _alignRe = RegExp(r'^\[align=(left|center|right|justify)\]');
 final _rtlRe = RegExp(r'[\u0590-\u08FF]');
 final _firstStrongRe = RegExp(r'[A-Za-z\u00C0-\u024F\u0259\u018F\u0400-\u04FF\u0590-\u08FF\uFB50-\uFEFF]');
 
+/// Human font name for a bundled family (DOCX/EPUB).
+String cssFamily(String f) => switch (f) {
+      'LibreBaskerville' => 'Libre Baskerville',
+      'DMSans' => 'DM Sans',
+      'NotoNaskhArabic' => 'Noto Naskh Arabic',
+      _ => f,
+    };
+
 /// Paragraph direction from its first strong letter (Unicode rule P2).
 bool isRtlText(String s) {
   final m = _firstStrongRe.firstMatch(s);
@@ -89,7 +97,10 @@ class DocxWriter {
         for (final (seg, ar) in scriptSegments(t)) {
           // Child order follows the OOXML schema (CT_RPr sequence).
           final rp = StringBuffer();
-          if (ar) rp.write('<w:rFonts w:cs="Noto Naskh Arabic"/>');
+          final fam = st.family != _base.family ? cssFamily(st.family) : null;
+          if (ar || fam != null) {
+            rp.write('<w:rFonts${fam != null ? ' w:ascii="$fam" w:hAnsi="$fam"' : ''}${ar ? ' w:cs="Noto Naskh Arabic"' : ''}/>');
+          }
           if (st.bold) rp.write(ar ? '<w:b/><w:bCs/>' : '<w:b/>');
           if (st.italic) rp.write(ar ? '<w:i/><w:iCs/>' : '<w:i/>');
           if (st.strike) rp.write('<w:strike/>');
@@ -339,9 +350,13 @@ class EpubWriter {
         if (st.italic) h = '<em>$h</em>';
         if (st.underline) h = '<u>$h</u>';
         if (st.strike) h = '<s>$h</s>';
-        if (st.color != _base.color) {
-          h = '<span style="color:#${(st.color & 0xFFFFFF).toRadixString(16).padLeft(6, '0')}">$h</span>';
-        }
+        final css = <String>[
+          if (st.color != _base.color) 'color:#${(st.color & 0xFFFFFF).toRadixString(16).padLeft(6, '0')}',
+          if (st.bg != 0) 'background:#${(st.bg & 0xFFFFFF).toRadixString(16).padLeft(6, '0')}',
+          if (st.size != _base.size && !st.sup) 'font-size:${(st.size / _base.size).toStringAsFixed(2)}em',
+          if (st.family != _base.family) "font-family:'${cssFamily(st.family)}'",
+        ];
+        if (css.isNotEmpty) h = '<span style="${css.join(';')}">$h</span>';
         b.write(h);
       }
       return b.toString();
