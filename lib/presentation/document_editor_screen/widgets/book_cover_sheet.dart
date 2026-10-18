@@ -538,8 +538,25 @@ class CoverPagePreview extends StatelessWidget {
     this.onTap,
   });
 
+  static const double _designW = 320;
+
   @override
   Widget build(BuildContext context) {
+    // Lay the cover out once at a fixed design width and scale it, so a
+    // thumbnail is an exact miniature of the full cover (no clamped fonts,
+    // no overflow at small sizes).
+    if ((width - _designW).abs() > 0.5) {
+      final design = CoverPagePreview(
+        template: template,
+        data: data,
+        width: _designW,
+        height: _designW * height / width,
+      );
+      return GestureDetector(
+        onTap: onTap,
+        child: SizedBox(width: width, height: height, child: FittedBox(fit: BoxFit.fill, child: design)),
+      );
+    }
     final title = data.title.trim().isEmpty ? 'Kitabın adı' : data.title.trim();
     final author =
         data.author.trim().isEmpty ? 'Müəllif' : data.author.trim();

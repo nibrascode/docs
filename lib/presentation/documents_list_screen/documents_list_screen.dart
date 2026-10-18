@@ -9,6 +9,8 @@ import '../../theme/app_theme.dart';
 import '../../services/supabase_service.dart';
 import '../../services/premium_service.dart';
 import '../../services/local_docs_cache.dart';
+import '../../services/doc_import_service.dart';
+import '../../services/mobile_export_service.dart';
 import '../../l10n/app_localizations.dart';
 import '../../widgets/language_selector_widget.dart';
 
@@ -119,7 +121,9 @@ class _DocumentsListScreenState extends State<DocumentsListScreen>
     if (_searchQuery.isNotEmpty) {
       result = result
           .where(
-            (d) => d.title.toLowerCase().contains(_searchQuery.toLowerCase()),
+            (d) =>
+                d.title.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+                d.content.toLowerCase().contains(_searchQuery.toLowerCase()),
           )
           .toList();
     }
@@ -178,7 +182,8 @@ class _DocumentsListScreenState extends State<DocumentsListScreen>
       }
     } catch (_) {}
     if (!mounted) return;
-    context.push(AppRoutes.documentEditorScreen, extra: extra);
+    await context.push(AppRoutes.documentEditorScreen, extra: extra);
+    if (mounted) _loadDocuments();
   }
 
   Future<void> _createNewDocument() async {
@@ -219,7 +224,100 @@ class _DocumentsListScreenState extends State<DocumentsListScreen>
       return;
     }
     if (!mounted) return;
-    context.push(AppRoutes.documentEditorScreen);
+    final l10n = AppLocalizations.of(context);
+    final choice = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (ctx) => SafeArea(
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          ListTile(
+            leading: const Icon(Icons.note_add_outlined),
+            title: Text(l10n.t(az: 'Boş sənəd', en: 'Blank document', ru: 'Пустой документ', ar: 'مستند فارغ')),
+            onTap: () => Navigator.pop(ctx, 'blank'),
+          ),
+          ListTile(
+            leading: const Icon(Icons.grid_view_rounded),
+            title: Text(l10n.templates),
+            onTap: () => Navigator.pop(ctx, 'template'),
+          ),
+          ListTile(
+            leading: const Icon(Icons.upload_file_rounded),
+            title: Text(l10n.t(az: 'Fayldan idxal (.docx, .txt, .md)', en: 'Import file (.docx, .txt, .md)', ru: 'Импорт файла (.docx, .txt, .md)', ar: 'استيراد ملف (.docx, .txt, .md)')),
+            onTap: () => Navigator.pop(ctx, 'import'),
+          ),
+          const SizedBox(height: 8),
+        ]),
+      ),
+    );
+    if (!mounted || choice == null) return;
+    if (choice == 'template') {
+      await context.push(AppRoutes.templatesScreen);
+    } else if (choice == 'import') {
+      try {
+        final doc = await DocImportService.pickDocument();
+        if (doc == null || !mounted) return;
+        final id = await LocalDocsCache.addNew(doc.title, doc.content);
+        await _loadDocuments();
+        final created = _docs.where((d) => d.id == id).toList();
+        if (created.isNotEmpty) await _openEditor(created.first);
+        return;
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(
+              l10n.t(az: 'Fayl oxunmadı: $e', en: 'Could not read file: $e', ru: 'Не удалось прочитать файл: $e', ar: 'تعذرت قراءة الملف: $e'))));
+        }
+        return;
+      }
+    } else {
+      await context.push(AppRoutes.documentEditorScreen);
+    }
+    if (mounted) _loadDocuments();
+  }
+
+  Future<void> _renameDocument(DocumentModel doc) async {
+    final l10n = AppLocalizations.of(context);
+    final ctrl = TextEditingController(text: doc.title);
+    final name = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(l10n.t(az: 'Adını dəyiş', en: 'Rename', ru: 'Переименовать', ar: 'إعادة تسمية')),
+        content: TextField(controller: ctrl, autofocus: true, onSubmitted: (v) => Navigator.pop(ctx, v)),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: Text(l10n.cancel)),
+          FilledButton(onPressed: () => Navigator.pop(ctx, ctrl.text), child: Text(l10n.t(az: 'Saxla', en: 'Save', ru: 'Сохранить', ar: 'حفظ'))),
+        ],
+      ),
+    );
+    if (name == null || name.trim().isEmpty) return;
+    await LocalDocsCache.rename(doc.id, name);
+    await _loadDocuments();
+  }
+
+  Future<void> _duplicateDocument(DocumentModel doc) async {
+    final l10n = AppLocalizations.of(context);
+    await LocalDocsCache.duplicate(doc.id,
+        suffix: l10n.t(az: ' (surət)', en: ' (copy)', ru: ' (копия)', ar: ' (نسخة)'));
+    await _loadDocuments();
+  }
+
+  Future<void> _confirmDelete(DocumentModel doc) async {
+    final l10n = AppLocalizations.of(context);
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(l10n.t(az: 'Sənəd silinsin?', en: 'Delete document?', ru: 'Удалить документ?', ar: 'حذف المستند؟')),
+        content: Text('«${doc.title}»'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(l10n.cancel)),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: AppTheme.error),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(l10n.delete),
+          ),
+        ],
+      ),
+    );
+    if (ok == true) await _deleteDocument(doc);
   }
 
   Future<void> _deleteDocument(DocumentModel doc) async {
@@ -291,7 +389,8 @@ class _DocumentsListScreenState extends State<DocumentsListScreen>
 
   Future<void> _shareDocument(DocumentModel doc) async {
     final title = doc.title.trim().isEmpty ? 'Nibras Docs' : doc.title.trim();
-    final body = doc.content.trim().isEmpty ? title : doc.content;
+    final plain = MobileExportService.plainText(doc.content);
+    final body = plain.trim().isEmpty ? title : plain;
     try {
       await Share.share(body, subject: title);
     } catch (e) {
@@ -532,15 +631,18 @@ class _DocumentsListScreenState extends State<DocumentsListScreen>
               iconBg: const Color(0xFF1E4B9E).withAlpha(25),
               title: l10n.templates,
               subtitle: l10n.t(
-                az: 'Tezliklə',
-                en: 'Coming soon',
-                ru: 'Скоро',
-                ar: 'قريباً',
+                az: 'Roman, hekayə, şeir…',
+                en: 'Novel, story, poetry…',
+                ru: 'Роман, рассказ, стихи…',
+                ar: 'رواية، قصة، شعر…',
               ),
               titleColor: const Color(0xFF0B1F4A),
               subtitleColor: const Color(0xFF0B1F4A).withAlpha(160),
               arrowColor: const Color(0xFF0B1F4A).withAlpha(140),
-              onTap: () => context.push(AppRoutes.templatesScreen),
+              onTap: () async {
+                await context.push(AppRoutes.templatesScreen);
+                if (mounted) _loadDocuments();
+              },
             ),
           ),
         ],
@@ -1082,9 +1184,17 @@ class _DocumentsListScreenState extends State<DocumentsListScreen>
                 _shareDocument(doc);
               },
             ),
+            _optionItem(ctx, Icons.drive_file_rename_outline, l10n.t(az: 'Adını dəyiş', en: 'Rename', ru: 'Переименовать', ar: 'إعادة تسمية'), () {
+              Navigator.pop(ctx);
+              _renameDocument(doc);
+            }),
+            _optionItem(ctx, Icons.copy_all_outlined, l10n.t(az: 'Surətini çıxar', en: 'Duplicate', ru: 'Дублировать', ar: 'تكرار'), () {
+              Navigator.pop(ctx);
+              _duplicateDocument(doc);
+            }),
             _optionItem(ctx, Icons.delete_outline_rounded, l10n.delete, () {
               Navigator.pop(ctx);
-              _deleteDocument(doc);
+              _confirmDelete(doc);
             }, isDestructive: true),
           ],
         ),

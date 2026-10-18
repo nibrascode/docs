@@ -17,7 +17,7 @@ import 'package:go_router/go_router.dart';
 import '../../theme/app_theme.dart';
 import '../../services/supabase_service.dart';
 import '../../services/pdf_service.dart';
-import '../../services/word_service.dart';
+import '../../services/book_writers.dart';
 import '../../services/mobile_export_service.dart';
 import '../../services/local_docs_cache.dart';
 import '../../services/template_service.dart';
@@ -2852,14 +2852,14 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
           SnackBar(
             content: Text(
               AppLocalizations.of(context).t(
-                az: 'PDF yüklənir... Çap dialoqunda "PDF kimi saxla" seçin',
-                en: 'PDF opening... Select "Save as PDF" in the print dialog',
-                ru: 'PDF открывается... Выберите "Сохранить как PDF" в диалоге печати',
-                ar: 'جارٍ فتح PDF... اختر "حفظ كـ PDF" في مربع حوار الطباعة',
+                az: 'PDF hazırdır. Surəti tətbiqin «exports» qovluğunda da saxlanıldı.',
+                en: 'PDF is ready. A copy was also saved in the app\'s exports folder.',
+                ru: 'PDF готов. Копия сохранена в папке exports приложения.',
+                ar: 'ملف PDF جاهز. حُفظت نسخة في مجلد exports في التطبيق.',
               ),
               style: GoogleFonts.dmSans(),
             ),
-            backgroundColor: const Color(0xFFE53E3E),
+            backgroundColor: AppTheme.primary,
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(10),
@@ -2876,15 +2876,24 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
     // If Word selected, generate and download .docx, then also save to DB
     if (format == ExportFormat.word) {
       final title = _extractTitle();
-      await WordService.generateAndDownload(
+      await MobileExportService.exportDocx(
         title: title,
         content: source,
-        pageSize: _pageSize,
-        textAlign: _alignment,
-        isBold: _isBold,
-        isItalic: _isItalic,
-        isUnderline: _isUnderline,
-        isStrikethrough: _isStrikethrough,
+        options: DocxOptions(
+          title: title,
+          author: _docSettings.author,
+          subtitle: _docSettings.subtitle,
+          fontFamily: _docSettings.fontFamily,
+          language: _docSettings.language,
+          pageSize: _pageSize,
+          landscape: _docSettings.landscape,
+          chapterNewPage: _docSettings.chapterNewPage,
+          firstLineIndent: _docSettings.firstLineIndent,
+          marginMm: _docSettings.marginMm,
+          fontSize: _docSettings.fontSize,
+          lineHeight: _docSettings.lineHeight,
+          textAlign: _alignment,
+        ),
       );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -2920,7 +2929,7 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('TXT exported', style: GoogleFonts.dmSans()),
+            content: Text(AppLocalizations.of(context).t(az: 'TXT hazırdır', en: 'TXT is ready', ru: 'TXT готов', ar: 'ملف TXT جاهز'), style: GoogleFonts.dmSans()),
             backgroundColor: AppTheme.primary,
             behavior: SnackBarBehavior.floating,
           ),
@@ -2935,11 +2944,14 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
       await MobileExportService.exportEpub(
         title: title,
         content: source,
+        author: _docSettings.author,
+        subtitle: _docSettings.subtitle,
+        language: _docSettings.language,
       );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('EPUB exported', style: GoogleFonts.dmSans()),
+            content: Text(AppLocalizations.of(context).t(az: 'EPUB hazırdır', en: 'EPUB is ready', ru: 'EPUB готов', ar: 'ملف EPUB جاهز'), style: GoogleFonts.dmSans()),
             backgroundColor: AppTheme.primary,
             behavior: SnackBarBehavior.floating,
           ),

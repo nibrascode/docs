@@ -3,25 +3,32 @@ import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../theme/app_theme.dart';
 import '../../routes/app_routes.dart';
+import 'dart:convert';
+import 'dart:typed_data';
+import '../../l10n/app_localizations.dart';
+import '../../services/doc_import_service.dart';
+import '../../services/local_docs_cache.dart';
+import '../../services/mobile_export_service.dart';
+import '../../widgets/language_selector_widget.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    String t(String az, String en, String ru, String ar) => l10n.t(az: az, en: en, ru: ru, ar: ar);
     return Scaffold(
       backgroundColor: AppTheme.backgroundDark,
       appBar: AppBar(
         backgroundColor: AppTheme.backgroundDark,
-        title: const Text(
-          'Parametrlər',
-          style: TextStyle(
-            color: AppTheme.goldLight,
-            fontWeight: FontWeight.w700,
-            fontSize: 18,
-          ),
+        iconTheme: const IconThemeData(color: AppTheme.goldLight),
+        title: Text(
+          t('Parametrlər', 'Settings', 'Настройки', 'الإعدادات'),
+          style: const TextStyle(color: AppTheme.goldLight, fontWeight: FontWeight.w700, fontSize: 18),
         ),
         centerTitle: true,
+        actions: const [LanguageSelectorWidget()],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
@@ -30,47 +37,91 @@ class SettingsScreen extends StatelessWidget {
           children: [
             _buildAppHeader(context),
             const SizedBox(height: 24),
-            _buildSectionTitle('Abunəlik'),
+            _buildSectionTitle(t('Məlumatlar', 'Data', 'Данные', 'البيانات')),
+            _buildTile(
+              context,
+              icon: Icons.backup_rounded,
+              iconColor: const Color(0xFF34D399),
+              title: t('Ehtiyat nüsxə çıxar', 'Back up all documents', 'Резервная копия', 'نسخ احتياطي'),
+              subtitle: t('Bütün sənədlər bir JSON faylında', 'All documents in one JSON file', 'Все документы в одном JSON', 'كل المستندات في ملف JSON'),
+              onTap: () async {
+                final json = await LocalDocsCache.exportAll();
+                final d = DateTime.now();
+                final name = 'nibras-docs-backup-${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}.json';
+                await MobileExportService.shareFile(Uint8List.fromList(utf8.encode(json)), name, 'application/json');
+              },
+            ),
+            _buildTile(
+              context,
+              icon: Icons.restore_rounded,
+              iconColor: const Color(0xFF60A5FA),
+              title: t('Ehtiyat nüsxədən bərpa et', 'Restore from backup', 'Восстановить из копии', 'استعادة من نسخة'),
+              subtitle: t('Mövcud sənədlər silinmir', 'Existing documents are kept', 'Существующие документы сохраняются', 'لا تُحذف المستندات الحالية'),
+              onTap: () async {
+                try {
+                  final n = await DocImportService.pickAndRestoreBackup();
+                  if (n == null || !context.mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                      content: Text(t('$n sənəd bərpa olundu', '$n documents restored', 'Восстановлено: $n', 'تمت استعادة $n'))));
+                } catch (e) {
+                  if (!context.mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                      content: Text(t('Bu fayl ehtiyat nüsxə deyil', 'This file is not a backup', 'Это не резервная копия', 'هذا الملف ليس نسخة احتياطية'))));
+                }
+              },
+            ),
+            const SizedBox(height: 16),
+            _buildSectionTitle(t('Abunəlik', 'Subscription', 'Подписка', 'الاشتراك')),
             _buildTile(
               context,
               icon: Icons.workspace_premium_rounded,
               iconColor: AppTheme.gold,
-              title: 'Premium Planlar',
-              subtitle: 'Tezliklə RevenueCat ilə',
+              title: t('Premium planlar', 'Premium plans', 'Премиум', 'الخطط المميزة'),
+              subtitle: t('İndi bütün alətlər pulsuz açıqdır', 'All tools are free for now', 'Сейчас все инструменты бесплатны', 'كل الأدوات مجانية حالياً'),
               onTap: () => context.push(AppRoutes.subscriptionPlanScreen),
             ),
             const SizedBox(height: 16),
-            _buildSectionTitle('Hüquqi'),
+            _buildSectionTitle(t('Hüquqi', 'Legal', 'Правовое', 'قانوني')),
             _buildTile(
               context,
               icon: Icons.shield_rounded,
               iconColor: const Color(0xFF60A5FA),
-              title: 'Məxfilik Siyasəti',
-              subtitle: 'Məlumatlarınızın necə qorunduğunu öyrənin',
+              title: t('Məxfilik siyasəti', 'Privacy policy', 'Политика конфиденциальности', 'سياسة الخصوصية'),
+              subtitle: t('Məlumatlarınızın necə qorunduğunu öyrənin', 'How your data is protected', 'Как защищены ваши данные', 'كيف نحمي بياناتك'),
               onTap: () => context.push(AppRoutes.privacyPolicyScreen),
             ),
             _buildTile(
               context,
               icon: Icons.gavel_rounded,
               iconColor: const Color(0xFF34D399),
-              title: 'İstifadə Şərtləri',
-              subtitle: 'Xidmət şərtləri və məlumat təhlükəsizliyi',
+              title: t('İstifadə şərtləri', 'Terms of service', 'Условия использования', 'شروط الاستخدام'),
+              subtitle: t('Xidmət şərtləri', 'Terms of the service', 'Условия сервиса', 'شروط الخدمة'),
               onTap: () => context.push(AppRoutes.termsOfServiceScreen),
             ),
             const SizedBox(height: 16),
-            _buildSectionTitle('Tətbiq haqqında'),
-            _buildInfoTile('Tətbiq adı', 'Nibras Docs'),
-            _buildInfoTile('Versiya', '1.0.0'),
-            _buildInfoTile('Yaş qrupu', '13+'),
-            _buildInfoTile('Əlaqə', 'nibrascode@gmail.com'),
-            const SizedBox(height: 16),
-            _buildSectionTitle('Hesab'),
-            _buildLogoutTile(context),
+            _buildSectionTitle(t('Tətbiq haqqında', 'About', 'О приложении', 'حول التطبيق')),
+            _buildInfoTile(t('Tətbiq adı', 'App name', 'Название', 'الاسم'), 'Nibras Docs'),
+            _buildInfoTile(t('Versiya', 'Version', 'Версия', 'الإصدار'), '1.1.0'),
+            _buildInfoTile(t('Əlaqə', 'Contact', 'Контакт', 'التواصل'), 'nibrascode@gmail.com'),
+            _buildInfoTile(t('Sayt', 'Website', 'Сайт', 'الموقع'), 'NibrasCode.com'),
+            if (_signedIn()) ...[
+              const SizedBox(height: 16),
+              _buildSectionTitle(t('Hesab', 'Account', 'Аккаунт', 'الحساب')),
+              _buildLogoutTile(context),
+            ],
             const SizedBox(height: 32),
           ],
         ),
       ),
     );
+  }
+
+  bool _signedIn() {
+    try {
+      return Supabase.instance.client.auth.currentUser != null;
+    } catch (_) {
+      return false;
+    }
   }
 
   Widget _buildAppHeader(BuildContext context) {

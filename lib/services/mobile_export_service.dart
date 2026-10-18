@@ -15,6 +15,7 @@ import '../core/book_chrome.dart';
 import '../core/page_layout.dart';
 import '../core/page_size.dart';
 import 'layout_pdf.dart';
+import 'book_writers.dart';
 import '../presentation/document_editor_screen/widgets/book_cover_sheet.dart';
 import '../presentation/document_editor_screen/widgets/table_editor_dialog.dart';
 
@@ -880,14 +881,13 @@ class MobileExportService {
     required String content,
     String author = '',
     String subtitle = '',
+    DocxOptions? options,
   }) async {
     if (kIsWeb) return;
     final safeTitle = title.trim().isEmpty ? 'Untitled_Document' : title.trim();
-    final bytes = _buildDocx(
-      title: safeTitle,
-      content: content,
-      author: author,
-      subtitle: subtitle,
+    final bytes = DocxWriter.build(
+      content,
+      options ?? DocxOptions(title: safeTitle, author: author, subtitle: subtitle),
     );
     await _shareBytes(
       bytes,
@@ -896,28 +896,45 @@ class MobileExportService {
     );
   }
 
+  /// Document markup -> readable plain text (for TXT export and sharing).
+  static String plainText(String content) {
+    var s = content;
+    s = s.replaceAll(RegExp(r'\[COVER[^\]]*\]'), '');
+    s = s.replaceAll('[TABLE]', '').replaceAll('[/TABLE]', '');
+    s = s.replaceAll(RegExp(r'^\[W\][^\n]*\n?', multiLine: true), '');
+    s = s.replaceAll(RegExp(r'^\|[ \-|]+\|\s*$\n?', multiLine: true), '');
+    s = s.replaceAll('[TOC]', '').replaceAll('[/TOC]', '');
+    s = s.replaceAll(RegExp(r'\[/?(note|HAŞİYƏ)\]'), '');
+    s = s.replaceAll(RegExp(r'\[align=(left|center|right|justify)\]'), '');
+    s = s.replaceAll(RegExp(r'\[size=\d+\]'), '').replaceAll('[/size]', '');
+    s = s.replaceAll(RegExp(r'\[img path="[^"]*"[^\]]*\]'), '[Image]');
+    s = s.replaceAll('--- Page Break ---', '\n\n');
+    s = s.replaceAll(RegExp(r'^#{1,3} ', multiLine: true), '');
+    s = s.replaceAll(RegExp(r'^> ', multiLine: true), '');
+    return _stripInline(s).replaceAll(RegExp(r'\n{3,}'), '\n\n').trim();
+  }
+
   static Future<void> exportTxt({
     required String title,
     required String content,
   }) async {
     if (kIsWeb) return;
     final safeTitle = title.trim().isEmpty ? 'Untitled' : title.trim();
-    var s = content;
-    s = s.replaceAll('[TABLE]', '').replaceAll('[/TABLE]', '');
-    s = s.replaceAll('[TOC]', '').replaceAll('[/TOC]', '');
-    s = s.replaceAll(RegExp(r'\[img path="[^"]*"[^\]]*\]'), '[Image]');
-    s = s.replaceAll('--- Page Break ---', '\n\n');
-    final bytes = Uint8List.fromList(utf8.encode(_stripInline(s)));
+    final bytes = Uint8List.fromList(utf8.encode(plainText(content)));
     await _shareBytes(bytes, _safeFileName(safeTitle, 'txt'), 'text/plain');
   }
 
   static Future<void> exportEpub({
     required String title,
     required String content,
+    String author = '',
+    String subtitle = '',
+    String language = 'az',
   }) async {
     if (kIsWeb) return;
     final safeTitle = title.trim().isEmpty ? 'Untitled' : title.trim();
-    final bytes = _buildEpub(title: safeTitle, content: _stripInline(content));
+    final bytes = EpubWriter.build(content,
+        title: safeTitle, author: author, subtitle: subtitle, language: language);
     await _shareBytes(bytes, _safeFileName(safeTitle, 'epub'), 'application/epub+zip');
   }
 
@@ -983,6 +1000,9 @@ class MobileExportService {
   static bool _detectRtl(String text) {
     return RegExp(r'[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]').hasMatch(text);
   }
+
+  static Future<String> shareFile(Uint8List bytes, String name, String mime) =>
+      _shareBytes(bytes, name, mime);
 
   static Future<String> _shareBytes(
     Uint8List bytes,
@@ -1252,6 +1272,8 @@ class MobileExportService {
         break;
       case 'nibrascode':
         inner = pw.Container(
+          width: double.infinity,
+          height: double.infinity,
           decoration: pw.BoxDecoration(border: pw.Border.all(color: accent, width: 0.8)),
           padding: const pw.EdgeInsets.symmetric(horizontal: 12, vertical: 16),
           child: pw.Column(
@@ -1262,10 +1284,12 @@ class MobileExportService {
               pw.Container(
                 width: 52,
                 height: 52,
+                alignment: pw.Alignment.center,
                 decoration: pw.BoxDecoration(
                   shape: pw.BoxShape.circle,
                   border: pw.Border.all(color: accent, width: 0.8),
                 ),
+                child: pw.Text('NC', style: pw.TextStyle(font: face.bold, fontSize: 15, letterSpacing: 1, color: accent)),
               ),
               pw.Spacer(),
               titleBlock(color: titleInk),

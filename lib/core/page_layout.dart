@@ -246,6 +246,8 @@ class PageLayoutEngine {
     r'|\[\^(\d+)\]'
     r'|\[size=(\d+)\]([\s\S]*?)\[/size\]',
   );
+  static final _strongLtr = RegExp(r'[A-Za-z\u00C0-\u024F\u0259\u018F\u0400-\u04FF]');
+  static final _firstStrong = RegExp(r'[A-Za-z\u00C0-\u024F\u0259\u018F\u0400-\u04FF\u0590-\u08FF]');
   static final _alignRe = RegExp(r'^\[align=(left|center|right|justify)\]');
   static final _arabic = RegExp(r'[\u0590-\u08FF\uFB1D-\uFEFC]');
 
@@ -281,7 +283,7 @@ class PageLayoutEngine {
   }
 
   /// Splits a line into styled runs (markup removed).
-  List<(String, LStyle)> runs(String src, LStyle st) {
+  static List<(String, LStyle)> runs(String src, LStyle st) {
     final out = <(String, LStyle)>[];
     var cur = 0;
     for (final m in _inline.allMatches(src)) {
@@ -426,22 +428,34 @@ class PageLayoutEngine {
           default:
             if (p.rtl) start = x0 + avail - w;
         }
+        // Bidi placement: words of the other direction keep their own order
+        // inside a run (e.g. a Latin phrase inside an Arabic paragraph).
         final placed = <LWord>[];
-        if (p.rtl) {
-          // Right-to-left: first word at the right edge.
-          var x = (p.align == 'justify' && !isLast) ? x0 + avail : start + w;
-          for (var k = 0; k < line.length; k++) {
-            if (k > 0 && !lineGlue[k]) x -= gap;
-            x -= line[k].width;
-            placed.add(LWord(line[k].text, line[k].style, x, line[k].width));
+        final paraDir = p.rtl ? 1 : 0;
+        int dirOf(String t) => _arabic.hasMatch(t) ? 1 : (_strongLtr.hasMatch(t) ? 0 : paraDir);
+        final runsIdx = <(int, List<int>)>[];
+        for (var k = 0; k < line.length; k++) {
+          final d = dirOf(line[k].text);
+          if (runsIdx.isNotEmpty && runsIdx.last.$1 == d) {
+            runsIdx.last.$2.add(k);
+          } else {
+            runsIdx.add((d, [k]));
           }
-        } else {
-          var x = start;
-          for (var k = 0; k < line.length; k++) {
-            if (k > 0 && !lineGlue[k]) x += gap;
-            placed.add(LWord(line[k].text, line[k].style, x, line[k].width));
-            x += line[k].width;
+        }
+        final visualRuns = p.rtl ? runsIdx.reversed.toList() : runsIdx;
+        final order = <int>[
+          for (final r in visualRuns) ...(r.$1 == 1 ? r.$2.reversed : r.$2),
+        ];
+        var x = (p.align == 'justify' && !isLast) ? x0 : start;
+        for (var v = 0; v < order.length; v++) {
+          final k = order[v];
+          if (v > 0) {
+            final prev = order[v - 1];
+            final glued = (k - prev).abs() == 1 && lineGlue[k > prev ? k : prev];
+            if (!glued) x += gap;
           }
+          placed.add(LWord(line[k].text, line[k].style, x, line[k].width));
+          x += line[k].width;
         }
         // Baseline: centre the font box inside the line box (like CSS).
         final baseline = y + (lh - p.base.size) / 2 + p.base.size * 0.8;
@@ -465,9 +479,11 @@ class PageLayoutEngine {
         double leftIndent = 0,
         double before = 0,
         double after = 0,
-        bool newPage = false}) {
-      final rtl = _arabic.hasMatch(text);
-      final (toks, glue) = _tokens(runs(text, st));
+        bool newPage = false,
+        bool raw = false}) {
+      final strong = _firstStrong.firstMatch(text)?.group(0) ?? '';
+      final rtl = _arabic.hasMatch(strong);
+      final (toks, glue) = _tokens(raw ? [(text, st)] : runs(text, st));
       return _Para(
         toks,
         st,
@@ -515,7 +531,7 @@ class PageLayoutEngine {
           if (pageHasContent) newPage();
           break;
         case DocBlockKind.sceneBreak:
-          placePara(para('*   *   *', body, offset, align: 'center', before: lineH(body) * 0.5, after: lineH(body) * 0.5));
+          placePara(para('*   *   *', body, offset, raw: true, align: 'center', before: lineH(body) * 0.5, after: lineH(body) * 0.5));
           break;
         case DocBlockKind.hr:
           if (y + 12 > bottom) newPage();

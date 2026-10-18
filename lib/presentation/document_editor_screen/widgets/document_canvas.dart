@@ -178,6 +178,10 @@ class DocumentBlocks {
     return blocks;
   }
 
+  /// Inverse of [parse]. Idempotent: serialize(parse(serialize(x))) is
+  /// stable, so opening and saving a document never adds blank lines.
+  /// Newlines that the parser keeps in neighbouring text blocks are not
+  /// written again; only those the block pattern itself consumes are.
   static String serialize(List<DocBlock> blocks) {
     final buf = StringBuffer();
     for (final b in blocks) {
@@ -186,15 +190,13 @@ class DocumentBlocks {
           buf.write(b.text);
           break;
         case DocBlockKind.table:
-          buf.write('\n');
           buf.write(TableBlock(
             start: 0,
             end: 0,
             cells: b.cells,
             colWidths: b.widths,
             caption: b.tableCaption,
-          ).toMarkup());
-          buf.write('\n');
+          ).toMarkup().trimRight());
           break;
         case DocBlockKind.image:
           var s =
@@ -203,22 +205,22 @@ class DocumentBlocks {
             s += ' caption="${b.imageCaption.replaceAll('"', "'")}"';
           }
           s += ']';
-          buf.write('\n$s\n');
+          buf.write(s);
           break;
         case DocBlockKind.pageBreak:
-          buf.write('\n\n--- Page Break ---\n\n');
+          buf.write('--- Page Break ---');
           break;
         case DocBlockKind.sceneBreak:
-          buf.write('\n\n* * *\n\n');
+          buf.write('\n* * *\n');
           break;
         case DocBlockKind.hr:
           buf.write('\n--------------------\n');
           break;
         case DocBlockKind.note:
-          buf.write('\n[note]${b.text}[/note]\n');
+          buf.write('[note]${b.text}[/note]');
           break;
         case DocBlockKind.cover:
-          buf.write('\n${b.text}\n');
+          buf.write(b.text);
           break;
       }
     }
