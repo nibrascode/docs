@@ -1,8 +1,7 @@
 name: Build Android APK
 
 on:
-  push:
-    branches: [ main, master ]
+  # Manual only for now: run it from the Actions tab when a build is wanted.
   workflow_dispatch:
 
 jobs:
