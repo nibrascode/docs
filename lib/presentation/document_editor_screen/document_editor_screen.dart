@@ -2810,12 +2810,22 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
 
   /// Extract title from first line of body text
   String _extractTitle() {
-    final text = _bodyCtrl.text.trim();
-    if (text.isEmpty) return AppLocalizations.of(context).untitledDocument;
-    final firstLine = text.split('\n').first.trim();
-    return firstLine.isEmpty
-        ? AppLocalizations.of(context).untitledDocument
-        : firstLine;
+    final text = _bodyCtrl.text;
+    final untitled = AppLocalizations.of(context).untitledDocument;
+    final cover = CoverData.parse(text);
+    if (cover != null && cover.title.isNotEmpty && cover.title != CoverData.brandTitle) return cover.title;
+    // First real line of text, without markup or block tokens.
+    for (final line in text.split('\n')) {
+      final t = line.trim();
+      if (t.isEmpty || t.startsWith('[COVER') || t.startsWith('[img') || t.startsWith('[TABLE') ||
+          t.startsWith('[/TABLE') || t.startsWith('|') || t.contains('Page Break') || t.startsWith('[note') ||
+          t.startsWith('[HAŞİYƏ') || RegExp(r'^[-*\s]+$').hasMatch(t)) {
+        continue;
+      }
+      final c = CoverData.cleanText(t);
+      if (c.isNotEmpty) return c.length > 80 ? '${c.substring(0, 80).trimRight()}…' : c;
+    }
+    return untitled;
   }
 
   Future<void> _saveDocument() async {

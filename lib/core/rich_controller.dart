@@ -229,7 +229,7 @@ class RichController extends TextEditingController {
       final next = (k.startsWith('h') && atEnd) ? '' : k;
       _kinds.insertAll(line + 1, List.filled(insNl, next));
     }
-    _st.replaceRange(a, a + del, insSt);
+    _st.replaceRange(a.clamp(0, _st.length), (a + del).clamp(0, _st.length), insSt);
     var result = nv;
     // Lists: Enter continues the list; Enter on an empty item ends it.
     if (ins == '\n' && del == 0) {

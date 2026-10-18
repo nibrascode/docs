@@ -96,9 +96,17 @@ class RichDoc {
     return (el, st, start);
   }
 
+  static final _cache = <String, String>{};
+
   static String _body(RLine l) {
+    if (l.text.isEmpty) return '';
+    final key = '${l.kind == '' ? 0 : 1}${Object.hashAll(l.st)}|${l.text}';
+    final hit = _cache[key];
+    if (hit != null) return hit;
     final (el, st, _) = elements(l);
-    return RichMarkup.serializeLine(el, st, literalPrefix: l.kind == '');
+    final out = RichMarkup.serializeLine(el, st, literalPrefix: l.kind == '');
+    if (_cache.length > 4000) _cache.clear();
+    return _cache[key] = out;
   }
 
   /// Raw (storage) lines; [rawCol] maps a line char offset to its raw offset.
