@@ -89,11 +89,20 @@ class DocxWriter {
     final rels = <String>[];
     var imgN = 0;
     var firstChapter = true;
+    // Real Word footnotes: [^n] -> footnoteReference, "[^n]: text" -> footnotes.xml.
+    final fnDefs = <String, String>{
+      for (final mm in RegExp(r'^\[\^(\d+)\]:[ \t]*(.*)$', multiLine: true).allMatches(content))
+        mm.group(1)!: mm.group(2)!.trim()
+    };
 
     String runsXml(String text, {bool raw = false}) {
       final b = StringBuffer();
       for (final (t, st) in raw ? [(text, _base)] : PageLayoutEngine.runs(text, _base)) {
         if (t.isEmpty) continue;
+        if (st.sup && fnDefs.containsKey(t)) {
+          b.write('<w:r><w:rPr><w:vertAlign w:val="superscript"/></w:rPr><w:footnoteReference w:id="$t"/></w:r>');
+          continue;
+        }
         final hex = (int c) => (c & 0xFFFFFF).toRadixString(16).padLeft(6, '0');
         for (final (seg, ar) in scriptSegments(t)) {
           // Child order follows the OOXML schema (CT_RPr sequence).
@@ -248,6 +257,8 @@ class DocxWriter {
               line = line.substring(am.end);
             }
             final t = line.trimRight();
+            final fm = RegExp(r'^\[\^(\d+)\]:').firstMatch(t);
+            if (fm != null && fnDefs.containsKey(fm.group(1))) continue; // in footnotes.xml
             if (t.trim().isEmpty) {
               chunkAlign = null;
               body.write('<w:p/>'); // empty line, as in the editor
@@ -329,6 +340,7 @@ class DocxWriter {
         '<Default Extension="png" ContentType="image/png"/><Default Extension="jpeg" ContentType="image/jpeg"/>'
         '<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>'
         '<Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>'
+        '<Override PartName="/word/footnotes.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footnotes+xml"/>'
         '<Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/>'
         '</Types>'));
     add('_rels/.rels', utf8.encode('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
@@ -339,9 +351,19 @@ class DocxWriter {
     add('word/_rels/document.xml.rels', utf8.encode('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
         '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
         '<Relationship Id="rIdStyles" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>'
+        '<Relationship Id="rIdFootnotes" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/footnotes" Target="footnotes.xml"/>'
         '${rels.join()}</Relationships>'));
     add('word/document.xml', utf8.encode(doc));
     add('word/styles.xml', utf8.encode(styles));
+    final fn = StringBuffer('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        '<w:footnotes xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
+        '<w:footnote w:type="separator" w:id="-1"><w:p><w:r><w:separator/></w:r></w:p></w:footnote>'
+        '<w:footnote w:type="continuationSeparator" w:id="0"><w:p><w:r><w:continuationSeparator/></w:r></w:p></w:footnote>');
+    fnDefs.forEach((n, t) => fn.write('<w:footnote w:id="$n"><w:p><w:pPr><w:pStyle w:val="FootnoteText"/></w:pPr>'
+        '<w:r><w:rPr><w:vertAlign w:val="superscript"/></w:rPr><w:footnoteRef/></w:r>'
+        '<w:r><w:t xml:space="preserve"> </w:t></w:r>${runsXml(t)}</w:p></w:footnote>'));
+    fn.write('</w:footnotes>');
+    add('word/footnotes.xml', utf8.encode(fn.toString()));
     add('docProps/core.xml', utf8.encode(core));
     media.forEach((n, d) => add('word/media/$n', d));
     return Uint8List.fromList(ZipEncoder().encode(arc)!);

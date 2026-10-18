@@ -9,6 +9,7 @@ import 'dart:math' as math;
 
 import 'table_spec.dart';
 import 'toc.dart';
+
 import 'dart:ui' as ui;
 
 import 'package:flutter/painting.dart';
@@ -18,6 +19,13 @@ import '../presentation/document_editor_screen/widgets/document_canvas.dart';
 import 'book_chrome.dart';
 import 'page_size.dart';
 import 'rich_markup.dart';
+
+/// Footnote look shared by page view and PDF.
+class FootnoteSpec {
+  static const double scale = 0.72;
+  static const double lineScale = 1.3;
+  static const double sepGap = 8.0;
+}
 
 const double kPtPerMm = 72 / 25.4;
 
@@ -138,6 +146,14 @@ class LPage {
   final List<LImage> images = [];
   CoverData? cover;
   bool plain = false; // no header / page number (title page)
+  /// Footnote numbers referenced on this page (printed at its foot).
+  final List<String> notes = [];
+  /// Height reserved at the bottom for those footnotes (points).
+  double footH = 0;
+  /// Where this page's text starts in the document (for the editor's
+  /// page-end lines): engine offset of the paragraph and its visual line.
+  int startOffset = -1;
+  int startK = 0;
   String header = '';
   String pageLabel = '';
   int physical = 0;
@@ -392,6 +408,18 @@ class PageLayoutEngine {
     final footerH = s.hasFooter ? s.bodyPt * 1.6 + 6 : 0.0;
     final top = m + headerH;
     final bottom = s.pageH - m - footerH;
+    // Footnotes: definitions "[^n]: text" print at the foot of the page
+    // where [^n] is referenced (like Word), not in the body.
+    final fnDefs = <String, String>{};
+    for (final mm in RegExp(r'^\[\^(\d+)\]:[ \t]*(.*)$', multiLine: true).allMatches(content)) {
+      fnDefs[mm.group(1)!] = mm.group(2)!.trim();
+    }
+    final fnStyle = LStyle(family: layoutFamily(s.fontFamily), size: s.bodyPt * FootnoteSpec.scale, color: s.ink);
+    final fnLh = fnStyle.size * FootnoteSpec.lineScale;
+    final fnCache = <String, List<List<LWord>>>{};
+    List<List<LWord>> noteLines(String n) =>
+        fnCache[n] ??= _wrapSimple('[^$n] ${fnDefs[n]}', fnStyle, s.pageW - m * 2);
+    double noteH(String n) => noteLines(n).length * fnLh;
     final left = m;
     final width = s.pageW - m * 2;
     final body = LStyle(family: layoutFamily(s.fontFamily), size: s.bodyPt, color: s.ink);
@@ -417,6 +445,7 @@ class PageLayoutEngine {
       final space = measure(' ', p.base);
       final indent = p.indentFirst ? p.base.size * 1.5 : 0.0;
       var i = 0;
+      var lineNo = 0;
       var firstLine = true;
       final (toks, glue) = (p.tokens, p.tokenOffsets.map((e) => e < 0).toList());
       if (toks.isEmpty) {
@@ -455,7 +484,21 @@ class PageLayoutEngine {
           w += add;
           i++;
         }
-        if (y + lh > bottom && pageHasContent) newPage();
+        List<String> refsOf() => [
+              for (final t in line)
+                if (t.style.sup && fnDefs.containsKey(t.text) && !page.notes.contains(t.text)) t.text
+            ];
+        double extra(List<String> r) =>
+            r.isEmpty ? 0 : r.fold(0.0, (a, n) => a + noteH(n)) + (page.notes.isEmpty ? FootnoteSpec.sepGap : 0);
+        if (y + lh > bottom - page.footH - extra(refsOf()) && pageHasContent) newPage();
+        final refs = refsOf();
+        page.footH += extra(refs);
+        page.notes.addAll(refs);
+        if (page.startOffset < 0 && page.lines.isEmpty) {
+          page.startOffset = p.offset;
+          page.startK = lineNo;
+        }
+        lineNo++;
         final isLast = i >= toks.length;
         // Horizontal placement.
         // RTL paragraphs take their indents on the right-hand side.
@@ -676,7 +719,7 @@ class PageLayoutEngine {
           placePara(para('*   *   *', body, offset, raw: true, align: 'center', before: lineH(body) * 0.5, after: lineH(body) * 0.5));
           break;
         case DocBlockKind.hr:
-          if (y + 12 > bottom) newPage();
+          if (y + 12 > bottom - page.footH) newPage();
           y += 6;
           page.rects.add(LRect(left, y, width, 0, stroke: s.ink, lineWidth: 0.6));
           y += 6;
@@ -701,7 +744,7 @@ class PageLayoutEngine {
             h = maxH;
             w = h * size.width / size.height;
           }
-          if (y + h > bottom && pageHasContent) newPage();
+          if (y + h > bottom - page.footH && pageHasContent) newPage();
           final x = switch (b.imageAlign) {
             'left' => left,
             'right' => left + width - w,
@@ -742,6 +785,9 @@ class PageLayoutEngine {
               if (pageHasContent) y += lineH(body);
               continue;
             }
+            if (_fnDefRe.hasMatch(t) && fnDefs.containsKey(_fnDefRe.firstMatch(t)!.group(1))) {
+              continue; // printed at the foot of its page
+            }
             if (t.startsWith('# ')) {
               final np = s.chapterNewPage && !firstChapter;
               firstChapter = false;
@@ -779,6 +825,19 @@ class PageLayoutEngine {
       offset += _blockLen(b);
     }
 
+    for (final pg in pages) {
+      if (pg.notes.isEmpty) continue;
+      final y0 = bottom - pg.footH;
+      pg.rects.add(LRect(left, y0 + FootnoteSpec.sepGap / 2, width * 0.3, 0, stroke: s.ink, lineWidth: 0.5));
+      var yy = y0 + FootnoteSpec.sepGap;
+      for (final n in pg.notes) {
+        for (final ln in noteLines(n)) {
+          pg.lines.add(LLine(ln, yy + (fnLh - fnStyle.size) / 2 + fnStyle.size * 0.8, yy, fnLh, false, -1));
+          yy += fnLh;
+        }
+      }
+    }
+
     // Drop a trailing empty page.
     if (pages.length > 1 && _empty(pages.last)) pages.removeLast();
 
@@ -813,6 +872,32 @@ class PageLayoutEngine {
         if (lv > 0) out.add(TocEntry(lv, TocSpec.plain(t.substring(lv + 1)), '00'));
       }
     }
+    return out;
+  }
+
+  static final _fnDefRe = RegExp(r'^\[\^(\d+)\]:');
+
+  /// Greedy word wrap starting at x = margin (used for footnotes).
+  List<List<LWord>> _wrapSimple(String text, LStyle st, double width) {
+    final (toks, glue) = _tokens(runs(text, st));
+    final sp = measure(' ', st);
+    final out = <List<LWord>>[];
+    var cur = <LWord>[];
+    var x = 0.0;
+    for (var i = 0; i < toks.length; i++) {
+      final t = toks[i];
+      final g = glue[i] && cur.isNotEmpty;
+      final add = cur.isEmpty || g ? 0.0 : sp;
+      if (cur.isNotEmpty && x + add + t.width > width) {
+        out.add(cur);
+        cur = [];
+        x = 0;
+      }
+      final gap = cur.isEmpty ? 0.0 : (g ? 0.0 : sp);
+      cur.add(LWord(t.text, t.style, s.margin + x + gap, t.width));
+      x += gap + t.width;
+    }
+    if (cur.isNotEmpty) out.add(cur);
     return out;
   }
 
