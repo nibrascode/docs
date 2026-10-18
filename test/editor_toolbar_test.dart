@@ -1,4 +1,5 @@
 import 'package:docspro/core/rich_markup.dart';
+import 'package:docspro/core/rich_controller.dart';
 import 'package:docspro/presentation/document_editor_screen/widgets/document_canvas.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -9,11 +10,13 @@ const sample = 'Salam dünya, bu sınaq mətnidir.\n\nİkinci abzas burada.';
 Finder para(String start) =>
     find.byWidgetPredicate((w) => w is TextField && (w.controller?.text.contains(start) ?? false));
 
-Future<MarkupTextController> focusPara(WidgetTester t, String start, TextSelection s) async {
+Future<RichController> focusPara(WidgetTester t, String start, TextSelection s) async {
   await t.tap(para(start).first);
   await t.pump();
-  final c = t.widget<TextField>(para(start).first).controller! as MarkupTextController;
-  c.selection = s;
+  final c = t.widget<TextField>(para(start).first).controller! as RichController;
+  // Offsets are relative to the paragraph that starts with [start].
+  final o = c.text.indexOf(start);
+  c.selection = TextSelection(baseOffset: s.baseOffset + o, extentOffset: s.extentOffset + o);
   await t.pump();
   return c;
 }
@@ -35,14 +38,13 @@ void main() {
       await t.tap(find.text(b).first);
       await t.pump();
     }
-    c = t.widget<TextField>(para('Salam').first).controller! as MarkupTextController;
-    final p = RichMarkup.parse(c.text);
-    expect(p.plain, 'Salam dünya, bu sınaq mətnidir.');
-    expect(p.st[p.plain.indexOf('d')], const SpanStyle(bold: true, italic: true, underline: true, strike: true));
-    expect(p.st[0], SpanStyle.plain);
-    expect(p.st[p.plain.indexOf(',')], SpanStyle.plain);
+    c = t.widget<TextField>(para('Salam').first).controller! as RichController;
+    expect(c.text, startsWith('Salam dünya, bu sınaq mətnidir.\n'));
+    expect(c.styles[c.text.indexOf('d')], const SpanStyle(bold: true, italic: true, underline: true, strike: true));
+    expect(c.styles[0], SpanStyle.plain);
+    expect(c.styles[c.text.indexOf(',')], SpanStyle.plain);
     // Caret inside the word: toolbar state reflects it.
-    c.selection = TextSelection.collapsed(offset: p.rawAt(8));
+    c.selection = const TextSelection.collapsed(offset: 8);
     await t.pump();
     expect(MarkupTextController.caret.value.bold, isTrue);
     expect(t.takeException(), isNull);
@@ -60,10 +62,9 @@ void main() {
     expect(swatches, findsWidgets);
     await t.tap(swatches.at(2), warnIfMissed: false);
     await settle(t);
-    final c = t.widget<TextField>(para('Salam').first).controller!;
-    final p = RichMarkup.parse(c.text);
-    expect(p.st[0].color ?? p.st[0].bg, isNotNull, reason: c.text);
-    expect(p.st[p.plain.indexOf('d')], SpanStyle.plain);
+    final c = t.widget<TextField>(para('Salam').first).controller! as RichController;
+    expect(c.styles[0].color ?? c.styles[0].bg, isNotNull, reason: c.text);
+    expect(c.styles[c.text.indexOf('d')], SpanStyle.plain);
     expect(t.takeException(), isNull);
   });
 
@@ -109,9 +110,9 @@ void main() {
     await settle(t);
     await t.tap(find.text('Lora').last);
     await settle(t);
-    var p = RichMarkup.parse(t.widget<TextField>(para('Salam').first).controller!.text);
-    expect(p.st[0].font, 'Lora');
-    expect(p.st[6].font, isNull);
+    final c = t.widget<TextField>(para('Salam').first).controller! as RichController;
+    expect(c.styles[0].font, 'Lora');
+    expect(c.styles[6].font, isNull);
     expect(t.takeException(), isNull);
     // Close the sheet and open the exact page view.
     await t.tapAt(const Offset(10, 10));

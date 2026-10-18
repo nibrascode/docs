@@ -5,7 +5,9 @@ class SpanStyle {
   final bool bold, italic, underline, strike;
   final String? color, bg, font; // '#RRGGBB' / family name
   final int? size; // px, like [size=N]
+  final String? link; // editor only: url of a [text](url) run
   const SpanStyle({
+    this.link,
     this.bold = false,
     this.italic = false,
     this.underline = false,
@@ -26,6 +28,7 @@ class SpanStyle {
     Object? bg = _keep,
     Object? font = _keep,
     Object? size = _keep,
+    Object? link = _keep,
   }) =>
       SpanStyle(
         bold: bold ?? this.bold,
@@ -36,7 +39,10 @@ class SpanStyle {
         bg: identical(bg, _keep) ? this.bg : bg as String?,
         font: identical(font, _keep) ? this.font : font as String?,
         size: identical(size, _keep) ? this.size : size as int?,
+        link: identical(link, _keep) ? this.link : link as String?,
       );
+
+  SpanStyle get noLink => link == null ? this : copyWith(link: null);
 
   SpanStyle withToggles(SpanStyle o) =>
       copyWith(bold: o.bold, italic: o.italic, underline: o.underline, strike: o.strike);
@@ -51,9 +57,10 @@ class SpanStyle {
       o.color == color &&
       o.bg == bg &&
       o.font == font &&
-      o.size == size;
+      o.size == size &&
+      o.link == link;
   @override
-  int get hashCode => Object.hash(bold, italic, underline, strike, color, bg, font, size);
+  int get hashCode => Object.hash(bold, italic, underline, strike, color, bg, font, size, link);
   @override
   String toString() =>
       'S(${bold ? 'b' : ''}${italic ? 'i' : ''}${underline ? 'u' : ''}${strike ? 's' : ''}'
@@ -156,6 +163,9 @@ class RichMarkup {
   );
   static final _ws = RegExp(r'\s');
 
+  /// Characters that a backslash makes literal.
+  static const escapable = r'\*_~[]#>';
+
   static ParsedMarkup parse(String raw) {
     final el = <String>[], rs = <int>[], re = <int>[];
     final st = <SpanStyle>[];
@@ -179,7 +189,13 @@ class RichMarkup {
     // 1) tokens
     final toks = <(int, int, String, String?)>[]; // start, end, kind, value
     var i = 0;
+    final esc = <int>{};
     while (i < line.length) {
+      if (line.codeUnitAt(i) == 0x5C && i + 1 < line.length && escapable.contains(line[i + 1])) {
+        esc.add(i);
+        i += 2;
+        continue;
+      }
       final m = _tok.matchAsPrefix(line, i);
       if (m == null) {
         i++;
@@ -252,6 +268,14 @@ class RichMarkup {
     void text(int upto) {
       final s = cur();
       for (var p = pos; p < upto; p++) {
+        if (esc.contains(p)) {
+          el.add(line[p + 1]);
+          st.add(s);
+          rs.add(base + p);
+          re.add(base + p + 2);
+          p++;
+          continue;
+        }
         el.add(line[p]);
         st.add(s);
         rs.add(base + p);
@@ -304,12 +328,56 @@ class RichMarkup {
     var start = 0;
     for (var k = 0; k <= el.length; k++) {
       if (k == el.length || el[k] == '\n') {
-        out.write(_serializeLine(el.sublist(start, k), st.sublist(start, k)));
+        out.write(serializeLine(el.sublist(start, k), st.sublist(start, k)));
         if (k < el.length) out.write('\n');
         start = k + 1;
       }
     }
     return out.toString();
+  }
+
+  static final _fnRe = RegExp(r'^\[\^\d+\]');
+  static final _bracketTok = RegExp(r'^\[(?:(?:color|bg|size|font)=|/(?:color|bg|size|font)\]|[^\[\]\n]{1,200}\]\((?:https?://|mailto:))');
+
+  /// One line of plain characters + styles → markup that parses back to
+  /// exactly these characters (literal markup characters are escaped only
+  /// when they would otherwise be read as markup).
+  static String serializeLine(List<String> el, List<SpanStyle> st, {bool literalPrefix = false}) {
+    final plain = _serializeLine(el, st);
+    if (_sameLine(plain, el, st, literalPrefix)) return plain;
+    final line = el.join();
+    final esc = <String>[];
+    for (var k = 0; k < el.length; k++) {
+      final e = el[k];
+      if (e.length != 1) {
+        esc.add(e);
+        continue;
+      }
+      var off = 0;
+      for (var j = 0; j < k; j++) {
+        off += el[j].length;
+      }
+      final rest = line.substring(off);
+      final need = switch (e) {
+        '*' || '_' || '~' || '\\' => true,
+        '[' => !_fnRe.hasMatch(rest) && _bracketTok.hasMatch(rest),
+        '#' || '>' => literalPrefix && k == 0,
+        _ => false,
+      };
+      esc.add(need ? '\\$e' : e);
+    }
+    return _serializeLine(esc, st);
+  }
+
+  static bool _sameLine(String raw, List<String> el, List<SpanStyle> st, bool literalPrefix) {
+    if (literalPrefix && el.isNotEmpty && (el.first == '#' || el.first == '>') && RegExp(r'^(#{1,3} |> )').hasMatch(el.join())) return false;
+    final p = parse(raw);
+    if (p.length != el.length) return false;
+    for (var k = 0; k < el.length; k++) {
+      if (p.el[k] != el[k]) return false;
+      if (!_ws.hasMatch(el[k]) && p.st[k] != st[k] && !(el[k].length > 1)) return false;
+    }
+    return true;
   }
 
   static String _serializeLine(List<String> el, List<SpanStyle> st0) {

@@ -7,6 +7,8 @@ import 'package:docspro/core/rich_markup.dart';
 import 'package:docspro/presentation/document_editor_screen/widgets/document_canvas.dart';
 import 'package:docspro/services/book_writers.dart';
 import 'package:flutter/material.dart';
+import 'package:docspro/core/rich_controller.dart';
+import 'package:docspro/core/rich_doc.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -188,7 +190,7 @@ void main() {
     await tester.tap(find.byType(TextField).first);
     await tester.pump();
     final tf = tester.widget<TextField>(find.byType(TextField).first);
-    final c = tf.controller as MarkupTextController;
+    final c = tf.controller as RichController;
     // Select "dünya" and make it red, then bold "ala".
     c.selection = const TextSelection(baseOffset: 6, extentOffset: 11);
     expect(key.currentState!.formatFocused(const FormatOp('color', red)), isTrue);
@@ -226,8 +228,9 @@ void main() {
         ),
       ),
     ));
-    final c2 = tester.widget<TextField>(find.byType(TextField).first).controller!;
-    expect(spans(c2.text), spans(saved));
+    final c2 = tester.widget<TextField>(find.byType(TextField).first).controller! as RichController;
+    expect(RichDoc.encode(c2.lines('left')), saved);
+    expect(c2.text, 'Salam dünya!');
     // Rendered spans hide markers and colour only that word.
     final span = c2.buildTextSpan(context: tester.element(find.byType(TextField).first), withComposing: false);
     final visible = <String>[];

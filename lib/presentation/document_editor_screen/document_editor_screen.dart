@@ -604,6 +604,13 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
   }
 
   void _applyStyle(String style) {
+    if (_canvasKey.currentState?.lineStyleFocused(style) == true) {
+      setState(() {
+        _hasUnsavedChanges = true;
+        _isSaved = false;
+      });
+      return;
+    }
     _syncCursorFromCanvas();
     final text = _bodyCtrl.text;
     final sel = _bodyCtrl.selection;
@@ -3450,6 +3457,13 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
   }
 
   void _indentParagraph(int delta) {
+    if (_canvasKey.currentState?.indentFocused(delta) == true) {
+      setState(() {
+        _hasUnsavedChanges = true;
+        _isSaved = false;
+      });
+      return;
+    }
     _syncCursorFromCanvas();
     final text = _bodyCtrl.text;
     final (start, end) = _paragraphRange();

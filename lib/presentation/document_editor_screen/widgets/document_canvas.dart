@@ -2,6 +2,8 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import '../../../core/rich_markup.dart';
+import '../../../core/rich_doc.dart';
+import '../../../core/rich_controller.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -273,9 +275,8 @@ class DocumentCanvasState extends State<DocumentCanvas> {
   int _imageOrdinal = 0;
   int? _focusTextIndex;
   TextSelection? _savedSel;
-  TextEditingController? _activeCtrl;
-  void Function(String align)? _aligner;
-  int Function({bool base})? _cursorFn;
+  RichController? _activeCtrl;
+  _ParagraphEditorState? _activeEd;
   DocBlock? _cursorBlock;
 
   /// Cursor offset in the full serialized document, or null if no text
@@ -291,21 +292,35 @@ class DocumentCanvasState extends State<DocumentCanvas> {
   }
 
   int? globalCursor({bool base = false}) {
-    final fn = _cursorFn;
+    final ed = _activeEd;
     final blk = _cursorBlock;
-    if (fn == null || blk == null) return null;
+    if (ed == null || !ed.mounted || blk == null) return null;
     final idx = _blocks.indexOf(blk);
     if (idx < 0) return null;
     final prefix = DocumentBlocks.serialize(_blocks.sublist(0, idx)).length;
-    return prefix + fn(base: base);
+    return prefix + ed.masterCursor(base: base);
   }
 
   bool alignFocused(String align) {
-    final fn = _aligner;
-    if (fn == null) return false;
-    fn(align);
+    final ed = _activeEd;
+    if (ed == null || !ed.mounted) return false;
+    ed.applyAlign(align);
     return true;
   }
+
+  /// Heading / quote / list / normal on the focused lines (no rebuild).
+  bool lineStyleFocused(String id) {
+    final ed = _activeEd;
+    return ed != null && ed.mounted && ed.applyLineStyle(id);
+  }
+
+  bool indentFocused(int delta) {
+    final ed = _activeEd;
+    return ed != null && ed.mounted && ed.indent(delta);
+  }
+
+  /// Link on the focused selection.
+  bool linkFocused(String? url) => _activeCtrl?.setLink(url) ?? false;
 
   @override
   void initState() {
@@ -327,7 +342,7 @@ class DocumentCanvasState extends State<DocumentCanvas> {
     _textCtrls = [];
     for (final b in _blocks) {
       if (b.kind == DocBlockKind.text || b.kind == DocBlockKind.note) {
-        final c = MarkupTextController(text: b.text);
+        final c = TextEditingController(text: b.text);
         c.addListener(_onText);
         _textCtrls.add(c);
       }
@@ -395,25 +410,18 @@ class DocumentCanvasState extends State<DocumentCanvas> {
   /// a bare cursor, to the text typed next. Returns false if nothing is focused.
   bool formatFocused(FormatOp op) {
     final c = _activeCtrl;
-    if (c is! MarkupTextController) return false;
-    final sel = c.selection;
-    if (!sel.isValid) return false;
-    if (sel.isCollapsed) {
-      final cur = c.caretStyle();
-      c.pending = op.readsToggle() && op.value == null ? op.apply(cur, on: !op.has(cur)) : op.apply(cur);
-      MarkupTextController.caret.value = c.pending!;
-      return true;
+    if (c == null) return false;
+    try {
+      return c.format(op);
+    } on FlutterError {
+      return false; // disposed
     }
-    final (raw, ns) = RichMarkup.applyRange(c.text, sel, op);
-    c.setRaw(TextEditingValue(text: raw, selection: ns));
-    MarkupTextController.caret.value = c.caretStyle();
-    return true;
   }
 
   /// Style at the focused caret (for toolbar highlighting).
   SpanStyle caretStyle() {
     final c = _activeCtrl;
-    return c is MarkupTextController ? c.caretStyle() : SpanStyle.plain;
+    return c == null ? SpanStyle.plain : c.caretStyle();
   }
 
   Future<void> _colorMenu() async {
@@ -498,13 +506,12 @@ class DocumentCanvasState extends State<DocumentCanvas> {
               hint: children.isEmpty ? widget.hint : null,
               firstLineIndent: widget.firstLineIndent,
               onActive: (c) => _activeCtrl = c,
-              onBindAlign: (fn) => _aligner = fn,
-              onBindCursor: (fn) {
-                _cursorFn = fn;
+              onBind: (s) {
+                _activeEd = s;
                 _cursorBlock = b;
               },
               onColor: _colorMenu,
-              onWrap: wrapFocused,
+              onFormat: formatFocused,
             ),
           );
           break;
@@ -534,22 +541,24 @@ class DocumentCanvasState extends State<DocumentCanvas> {
                         color: const Color(0xFF8A6A1A),
                       ),
                     ),
-                    TextField(
-                      controller: nctrl,
+                    _ParagraphEditor(
+                      master: nctrl,
                       readOnly: widget.readOnly,
-                      maxLines: null,
+                      hint: 'Kənar qeyd yazın…',
+                      firstLineIndent: false,
                       style: GoogleFonts.lora(
                         fontSize: 11,
                         height: 1.35,
                         fontStyle: FontStyle.italic,
                         color: const Color(0xFF3A2A10),
                       ),
-                      decoration: const InputDecoration(
-                        hintText: 'Kənar qeyd yazın…',
-                        isDense: true,
-                        border: InputBorder.none,
-                        contentPadding: EdgeInsets.zero,
-                      ),
+                      onActive: (c) => _activeCtrl = c,
+                      onBind: (s) {
+                        _activeEd = s;
+                        _cursorBlock = b;
+                      },
+                      onColor: _colorMenu,
+                      onFormat: formatFocused,
                     ),
                   ],
                 ),
@@ -1415,24 +1424,37 @@ class _VisualTableState extends State<_VisualTable> {
   }
 }
 
-class _P {
+class _G {
   String align;
-  final TextEditingController c;
+  final RichController c;
   final FocusNode f = FocusNode();
-  _P(this.align, this.c);
+  bool rtl = false;
+  _G(this.align, this.c);
 }
 
+final _strongRe = RegExp(r'[A-Za-z\u00C0-\u024F\u0259\u018F\u0400-\u04FF\u0590-\u08FF\uFB50-\uFEFF]');
+final _rtlCharRe = RegExp(r'[\u0590-\u08FF\uFB50-\uFEFF]');
+
+bool _isRtl(String s) {
+  final m = _strongRe.firstMatch(s);
+  return m != null && _rtlCharRe.hasMatch(m.group(0)!);
+}
+
+/// Edits one text block. Lines live in as few TextFields as possible: one
+/// per run of lines with the same alignment (long blocks are cut at blank
+/// lines every few thousand characters). Enter only inserts a line break in
+/// the same field, so any number of empty lines works and the keyboard never
+/// jumps between fields while typing.
 class _ParagraphEditor extends StatefulWidget {
   final TextEditingController master;
   final TextStyle style;
   final bool readOnly;
   final String? hint;
   final bool firstLineIndent;
-  final void Function(TextEditingController c) onActive;
-  final void Function(void Function(String align) fn) onBindAlign;
+  final void Function(RichController c) onActive;
+  final void Function(_ParagraphEditorState s) onBind;
   final VoidCallback onColor;
-  final bool Function(String left, String right) onWrap;
-  final void Function(int Function({bool base}) masterCursor) onBindCursor;
+  final bool Function(FormatOp op) onFormat;
 
   const _ParagraphEditor({
     required this.master,
@@ -1441,10 +1463,9 @@ class _ParagraphEditor extends StatefulWidget {
     required this.hint,
     required this.firstLineIndent,
     required this.onActive,
-    required this.onBindAlign,
+    required this.onBind,
     required this.onColor,
-    required this.onWrap,
-    required this.onBindCursor,
+    required this.onFormat,
   });
 
   @override
@@ -1452,41 +1473,16 @@ class _ParagraphEditor extends StatefulWidget {
 }
 
 class _ParagraphEditorState extends State<_ParagraphEditor> {
-  final List<_P> _paras = [];
+  final List<_G> _gs = [];
   int _focus = 0;
   bool _writing = false;
-
-  static final _alignRe = RegExp(r'^\[align=(left|center|right|justify)\]');
+  static const _chunk = 4000;
 
   @override
   void initState() {
     super.initState();
-    _load(widget.master.text);
+    _build(RichDoc.decode(widget.master.text));
     widget.master.addListener(_onMaster);
-  }
-
-  /// This block became the active one: route align / cursor queries here.
-  void _activate(int i) {
-    _focus = i;
-    widget.onActive(_paras[i].c);
-    widget.onBindAlign(_applyAlign);
-    widget.onBindCursor(_masterCursor);
-  }
-
-  /// Cursor position inside the master text of this block.
-  int _masterCursor({bool base = false}) {
-    if (_paras.isEmpty) return 0;
-    final i = _focus.clamp(0, _paras.length - 1);
-    var off = 0;
-    for (var k = 0; k < i; k++) {
-      final p = _paras[k];
-      off += (p.align == 'left' ? 0 : '[align=${p.align}]'.length) + p.c.text.length + 2;
-    }
-    final p = _paras[i];
-    off += p.align == 'left' ? 0 : '[align=${p.align}]'.length;
-    final sel = p.c.selection;
-    off += sel.isValid ? (base ? sel.baseOffset : sel.extentOffset).clamp(0, p.c.text.length) : p.c.text.length;
-    return off;
   }
 
   @override
@@ -1495,137 +1491,308 @@ class _ParagraphEditorState extends State<_ParagraphEditor> {
     if (oldWidget.master != widget.master) {
       oldWidget.master.removeListener(_onMaster);
       widget.master.addListener(_onMaster);
-      _load(widget.master.text);
+      _reload(widget.master.text);
     }
   }
 
   @override
   void dispose() {
     widget.master.removeListener(_onMaster);
-    for (final p in _paras) {
-      p.c.removeListener(_onPara);
-      p.c.dispose();
-      p.f.dispose();
+    for (final g in _gs) {
+      g.c.removeListener(_onG);
+      g.c.dispose();
+      g.f.dispose();
     }
     super.dispose();
   }
 
-  TextAlign _ta(String a) {
-    switch (a) {
-      case 'center':
-        return TextAlign.center;
-      case 'right':
-        return TextAlign.right;
-      case 'justify':
-        return TextAlign.justify;
-      default:
-        return TextAlign.left;
-    }
-  }
+  // ------------------------------------------------------------ structure
 
-  _P _newP(String align, TextEditingController c) {
-    final p = _P(align, c);
-    p.f.addListener(() {
-      if (p.f.hasFocus) {
-        final i = _paras.indexOf(p);
-        if (i >= 0) _activate(i);
+  List<RLine> _allLines() => [for (final g in _gs) ...g.c.lines(g.align)];
+
+  void _build(List<RLine> lines) {
+    final old = List.of(_gs);
+    _gs.clear();
+    var cur = <RLine>[];
+    var size = 0;
+    void close() {
+      if (cur.isEmpty) return;
+      final c = RichController(lines: cur);
+      c.addListener(_onG);
+      final g = _G(cur.first.align, c)..rtl = _isRtl(c.text);
+      g.f.addListener(() {
+        if (g.f.hasFocus) {
+          final i = _gs.indexOf(g);
+          if (i >= 0) _activate(i);
+        }
+      });
+      g.f.onKeyEvent = (node, e) => _onKey(g, e);
+      _gs.add(g);
+      cur = [];
+      size = 0;
+    }
+
+    for (final l in lines) {
+      final split = cur.isNotEmpty &&
+          (l.align != cur.first.align || (size > _chunk && cur.last.text.trim().isEmpty && l.text.trim().isNotEmpty));
+      if (split) close();
+      cur.add(l);
+      size += l.text.length + 1;
+    }
+    close();
+    if (_gs.isEmpty) {
+      cur = [RLine.empty()];
+      close();
+    }
+    if (_focus >= _gs.length) _focus = _gs.length - 1;
+    if (old.isNotEmpty) {
+      for (final g in old) {
+        g.c.removeListener(_onG);
       }
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        for (final g in old) {
+          g.c.dispose();
+          g.f.dispose();
+        }
+      });
+    }
+  }
+
+  /// (global line, column) of an offset inside group [gi].
+  (int, int) _global(int gi, int off) {
+    var gl = 0;
+    for (var k = 0; k < gi; k++) {
+      gl += '\n'.allMatches(_gs[k].c.text).length + 1;
+    }
+    final c = _gs[gi].c;
+    final o = off.clamp(0, c.text.length);
+    return (gl + c.lineOf(o), o - c.lineStart(o));
+  }
+
+  (int, int) _locate(int gl, int col) {
+    var base = 0;
+    for (var gi = 0; gi < _gs.length; gi++) {
+      final n = '\n'.allMatches(_gs[gi].c.text).length + 1;
+      if (gl < base + n || gi == _gs.length - 1) {
+        final c = _gs[gi].c;
+        var off = 0;
+        for (var k = 0; k < gl - base && off <= c.text.length; k++) {
+          final i = c.text.indexOf('\n', off);
+          if (i < 0) break;
+          off = i + 1;
+        }
+        final end = c.lineEnd(off);
+        return (gi, (off + col).clamp(off, end));
+      }
+      base += n;
+    }
+    return (0, 0);
+  }
+
+  void _refocus((int, int) a, [(int, int)? b]) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _gs.isEmpty) return;
+      final (gi, off) = _locate(a.$1, a.$2);
+      var base = off;
+      if (b != null) {
+        final (gb, ob) = _locate(b.$1, b.$2);
+        if (gb == gi) base = ob;
+      }
+      _gs[gi].f.requestFocus();
+      _gs[gi].c.selection = TextSelection(baseOffset: base, extentOffset: off);
+      _activate(gi);
     });
-    return p;
   }
 
-  void _load(String raw) {
-    for (final p in _paras) {
-      p.c.removeListener(_onPara);
-      p.c.dispose();
-      p.f.dispose();
-    }
-    _paras.clear();
-    final chunks = raw.isEmpty ? [''] : raw.split('\n\n');
-    for (final chunk in chunks) {
-      final m = _alignRe.firstMatch(chunk);
-      final align = m?.group(1) ?? 'left';
-      final body = m == null ? chunk : chunk.substring(m.end);
-      final c = MarkupTextController(text: body)..richTyping = true;
-      c.addListener(_onPara);
-      _paras.add(_newP(align, c));
-    }
-    if (_focus >= _paras.length) _focus = _paras.length - 1;
+  void _rebuild(List<RLine> lines, (int, int) caret, [(int, int)? base]) {
+    setState(() => _build(lines));
+    _push();
+    _refocus(caret, base);
   }
 
-  String _dump() {
-    return _paras.map((p) {
-      if (p.align == 'left') return p.c.text;
-      return '[align=${p.align}]${p.c.text}';
-    }).join('\n\n');
+  void _reload(String raw) {
+    final had = _gs.any((g) => g.f.hasFocus);
+    (int, int)? pos;
+    if (had && _focus < _gs.length) {
+      final sel = _gs[_focus].c.selection;
+      if (sel.isValid) pos = _global(_focus, sel.extentOffset);
+    }
+    _build(RichDoc.decode(raw));
+    if (pos != null) _refocus(pos);
+  }
+
+  // ------------------------------------------------------------- binding
+
+  void _activate(int i) {
+    _focus = i;
+    widget.onActive(_gs[i].c);
+    widget.onBind(this);
+  }
+
+  RichController? get focused => _gs.isEmpty ? null : _gs[_focus.clamp(0, _gs.length - 1)].c;
+
+  /// Cursor position inside the master (raw) text of this block.
+  int masterCursor({bool base = false}) {
+    if (_gs.isEmpty) return 0;
+    final i = _focus.clamp(0, _gs.length - 1);
+    final sel = _gs[i].c.selection;
+    final c = _gs[i].c;
+    final off = sel.isValid ? (base ? sel.baseOffset : sel.extentOffset) : c.text.length;
+    final (gl, col) = _global(i, off);
+    return RichDoc.rawOffset(_allLines(), gl, col);
+  }
+
+  /// Alignment for the selected lines of the focused field.
+  void applyAlign(String align) {
+    if (_gs.isEmpty) return;
+    final i = _focus.clamp(0, _gs.length - 1);
+    final c = _gs[i].c;
+    final sel = c.selection.isValid ? c.selection : TextSelection.collapsed(offset: c.text.length);
+    final a = _global(i, sel.start), z = _global(i, sel.end);
+    final lines = _allLines();
+    for (var l = a.$1; l <= z.$1 && l < lines.length; l++) {
+      lines[l].align = align;
+    }
+    final ext = _global(i, sel.extentOffset), bas = _global(i, sel.baseOffset);
+    _rebuild(lines, ext, bas);
+  }
+
+  /// Heading / quote / list / normal for the selected lines.
+  bool applyLineStyle(String id) {
+    final c = focused;
+    if (c == null || !c.selection.isValid) return false;
+    switch (id) {
+      case 'h1':
+      case 'chapter':
+        c.setKind('h1');
+      case 'h2':
+      case 'subchapter':
+        c.setKind('h2');
+      case 'h3':
+      case 'h4':
+        c.setKind('h3');
+      case 'quote':
+        c.setKind('quote');
+      case 'normal':
+        c.setKind('');
+        c.removeListMarkers();
+      case 'bullet':
+        c.toggleList(false);
+      case 'number':
+        c.toggleList(true);
+      default:
+        return false;
+    }
+    return true;
+  }
+
+  bool indent(int delta) {
+    final c = focused;
+    if (c == null || !c.selection.isValid) return false;
+    c.indent(delta);
+    return true;
+  }
+
+  // ------------------------------------------------------------- events
+
+  KeyEventResult _onKey(_G g, KeyEvent e) {
+    if (e is! KeyDownEvent && e is! KeyRepeatEvent) return KeyEventResult.ignored;
+    final i = _gs.indexOf(g);
+    final sel = g.c.selection;
+    if (i < 0 || !sel.isValid || !sel.isCollapsed) return KeyEventResult.ignored;
+    final k = e.logicalKey;
+    if (k == LogicalKeyboardKey.backspace && sel.baseOffset == 0 && i > 0) {
+      _mergeUp(i);
+      return KeyEventResult.handled;
+    }
+    if (k == LogicalKeyboardKey.arrowUp && g.c.lineOf(sel.baseOffset) == 0 && i > 0) {
+      final p = _gs[i - 1];
+      p.f.requestFocus();
+      p.c.selection = TextSelection.collapsed(offset: p.c.text.length);
+      return KeyEventResult.handled;
+    }
+    if (k == LogicalKeyboardKey.arrowDown && g.c.lineEnd(sel.baseOffset) == g.c.text.length && i < _gs.length - 1) {
+      final n = _gs[i + 1];
+      n.f.requestFocus();
+      n.c.selection = const TextSelection.collapsed(offset: 0);
+      return KeyEventResult.handled;
+    }
+    return KeyEventResult.ignored;
+  }
+
+  /// Backspace at the very start of a field joins it with the line above.
+  void _mergeUp(int i) {
+    final (gl, _) = _global(i, 0);
+    final lines = _allLines();
+    final up = lines[gl - 1], low = lines[gl];
+    final col = up.text.length;
+    final kind = up.text.isEmpty ? low.kind : up.kind;
+    final align = up.text.isEmpty ? low.align : up.align;
+    lines[gl - 1] = RLine(up.text + low.text, [...up.st, ...low.st], align: align, kind: kind);
+    lines.removeAt(gl);
+    _rebuild(lines, (gl - 1, col));
+  }
+
+  void _onMaster() {
+    if (_writing) return;
+    if (RichDoc.encode(_allLines()) == widget.master.text) return;
+    setState(() => _reload(widget.master.text));
+  }
+
+  void _onG() {
+    _push();
+    var changed = false;
+    for (final g in _gs) {
+      final r = _isRtl(g.c.text);
+      if (r != g.rtl) {
+        g.rtl = r;
+        changed = true;
+      }
+    }
+    if (changed && mounted) setState(() {});
   }
 
   void _push() {
-    final joined = _dump();
+    final joined = RichDoc.encode(_allLines());
     if (joined == widget.master.text) return;
     _writing = true;
     widget.master.text = joined;
     _writing = false;
   }
 
-  void _onMaster() {
-    if (_writing) return;
-    if (_dump() == widget.master.text) return;
-    setState(() => _load(widget.master.text));
-  }
-
-  void _onPara() {
-    for (var i = 0; i < _paras.length; i++) {
-      final sel = _paras[i].c.selection;
-      if (sel.isValid && !sel.isCollapsed) {
-        _activate(i);
-      }
-    }
-    for (var i = 0; i < _paras.length; i++) {
-      final t = _paras[i].c.text;
-      if (t.contains('\n\n')) {
-        final parts = t.split('\n\n');
-        _paras[i].c.removeListener(_onPara);
-        (_paras[i].c as MarkupTextController).setRaw(
-            TextEditingValue(text: parts.first, selection: TextSelection.collapsed(offset: parts.first.length)));
-        _paras[i].c.addListener(_onPara);
-        for (var k = 1; k < parts.length; k++) {
-          final c = MarkupTextController(text: parts[k])..richTyping = true;
-          c.addListener(_onPara);
-          _paras.insert(i + k, _newP(_paras[i].align, c));
-        }
-        _push();
-        setState(() {});
-        return;
-      }
-    }
-    _push();
-  }
-
-  void _applyAlign(String align) {
-    if (_paras.isEmpty) return;
-    final i = _focus.clamp(0, _paras.length - 1);
-    setState(() => _paras[i].align = align);
-    _push();
-  }
+  TextAlign _ta(String a) => switch (a) {
+        'center' => TextAlign.center,
+        'right' => TextAlign.right,
+        'justify' => TextAlign.justify,
+        _ => TextAlign.start,
+      };
 
   Widget _menu(BuildContext ctx, EditableTextState editable) {
     final l10n = AppLocalizations.of(ctx);
+    final c = editable.widget.controller;
+    ContextMenuButtonItem fmt(String label, FormatOp op) => ContextMenuButtonItem(
+          label: label,
+          onPressed: () {
+            ContextMenuController.removeAny();
+            widget.onFormat(op);
+          },
+        );
     return AdaptiveTextSelectionToolbar.buttonItems(
       anchors: editable.contextMenuAnchors,
       buttonItems: [
         for (final it in editable.contextMenuButtonItems)
-          if (it.type == ContextMenuButtonType.copy || it.type == ContextMenuButtonType.cut)
+          if ((it.type == ContextMenuButtonType.copy || it.type == ContextMenuButtonType.cut) && c is RichController)
             ContextMenuButtonItem(
               type: it.type,
               onPressed: () async {
-                final c = editable.widget.controller;
                 final v = c.value;
                 ContextMenuController.removeAny();
-                await RichClipboard.copy(v.text, v.selection);
-                if (it.type == ContextMenuButtonType.cut && c is MarkupTextController) {
-                  final (raw, caret) = RichMarkup.deleteRange(v.text, v.selection);
-                  c.setRaw(TextEditingValue(text: raw, selection: TextSelection.collapsed(offset: caret)));
+                await c.copySelection();
+                if (it.type == ContextMenuButtonType.cut && v.selection.isValid && !v.selection.isCollapsed) {
+                  c.value = TextEditingValue(
+                    text: v.text.replaceRange(v.selection.start, v.selection.end, ''),
+                    selection: TextSelection.collapsed(offset: v.selection.start),
+                  );
                 }
               },
             )
@@ -1638,49 +1805,36 @@ class _ParagraphEditorState extends State<_ParagraphEditor> {
             widget.onColor();
           },
         ),
-        ContextMenuButtonItem(
-          label: l10n.t(az: 'Qalın', en: 'Bold', ru: 'Жирный', ar: 'عريض'),
-          onPressed: () {
-            ContextMenuController.removeAny();
-            widget.onWrap('**', '**');
-          },
-        ),
-        ContextMenuButtonItem(
-          label: l10n.t(az: 'Əyri', en: 'Italic', ru: 'Курсив', ar: 'مائل'),
-          onPressed: () {
-            ContextMenuController.removeAny();
-            widget.onWrap('*', '*');
-          },
-        ),
-        ContextMenuButtonItem(
-          label: l10n.t(az: 'Xətt', en: 'Underline', ru: 'Подчёркнутый', ar: 'تسطير'),
-          onPressed: () {
-            ContextMenuController.removeAny();
-            widget.onWrap('__', '__');
-          },
-        ),
+        fmt(l10n.t(az: 'Qalın', en: 'Bold', ru: 'Жирный', ar: 'عريض'), const FormatOp('bold')),
+        fmt(l10n.t(az: 'Əyri', en: 'Italic', ru: 'Курсив', ar: 'مائل'), const FormatOp('italic')),
+        fmt(l10n.t(az: 'Xətt', en: 'Underline', ru: 'Подчёркнутый', ar: 'تسطير'), const FormatOp('underline')),
       ],
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    final empty = _gs.length == 1 && _gs.first.c.text.isEmpty;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        for (var i = 0; i < _paras.length; i++)
+        for (var i = 0; i < _gs.length; i++)
           TextField(
-            controller: _paras[i].c,
-            focusNode: _paras[i].f,
+            key: ObjectKey(_gs[i]),
+            controller: _gs[i].c,
+            focusNode: _gs[i].f,
             readOnly: widget.readOnly,
             maxLines: null,
             keyboardType: TextInputType.multiline,
+            textInputAction: TextInputAction.newline,
+            textCapitalization: TextCapitalization.sentences,
             style: widget.style,
-            textAlign: _ta(_paras[i].align),
+            textAlign: _ta(_gs[i].align),
+            textDirection: _gs[i].rtl ? TextDirection.rtl : TextDirection.ltr,
             contextMenuBuilder: _menu,
             onTap: () => _activate(i),
             decoration: InputDecoration(
-              hintText: i == 0 ? widget.hint : null,
+              hintText: i == 0 && empty ? widget.hint : null,
               hintStyle: widget.style.copyWith(color: Colors.black38),
               border: InputBorder.none,
               enabledBorder: InputBorder.none,
@@ -1697,193 +1851,9 @@ class _ParagraphEditorState extends State<_ParagraphEditor> {
   }
 }
 
+/// Kept for the toolbar and older call sites.
 class MarkupTextController extends TextEditingController {
-  MarkupTextController({String? text})
-      : _base = text ?? '',
-        super(text: text);
-
-  /// Style at the caret of the focused paragraph (drives toolbar state).
-  static final caret = ValueNotifier<SpanStyle>(SpanStyle.plain);
-
-  /// When true (paragraph editors), user edits are reconciled with the span
-  /// model so typed text inherits formatting and pending styles apply.
-  bool richTyping = false;
-
-  /// Style for the next typed text when the cursor has no selection.
-  SpanStyle? pending;
-
-  String _base;
-  bool _internal = false;
-
-  /// Programmatic update that bypasses reconciliation.
-  void setRaw(TextEditingValue v) {
-    _internal = true;
-    super.value = v;
-    _internal = false;
-    _base = v.text;
-  }
-
-  SpanStyle caretStyle() {
-    if (pending != null) return pending!;
-    final p = RichMarkup.parse(text);
-    final sel = selection;
-    if (!sel.isValid) return SpanStyle.plain;
-    if (!sel.isCollapsed) {
-      final a = p.plainAt(sel.start);
-      return a < p.length ? p.st[a] : p.styleAt(a);
-    }
-    return p.styleAt(p.plainAt(sel.extentOffset));
-  }
-
-  @override
-  set value(TextEditingValue nv) {
-    if (_internal || !richTyping) {
-      super.value = nv;
-      _base = nv.text;
-      return;
-    }
-    final composing = nv.composing.isValid && !nv.composing.isCollapsed;
-    if (nv.text == _base) {
-      if (nv.selection != selection && nv.text == text) pending = null;
-      super.value = nv;
-      caret.value = caretStyle();
-      return;
-    }
-    if (composing || !nv.selection.isValid) {
-      super.value = nv; // keep _base: reconcile once the word is committed
-      return;
-    }
-    final fixed = RichMarkup.reconcile(_base, nv, pending, clip: RichClipboard.last);
-    super.value = fixed ?? nv;
-    _base = super.value.text;
-    caret.value = caretStyle();
-  }
-
-  static Color? _hex(String? s) {
-    if (s == null || s.isEmpty) return null;
-    var h = s.replaceAll('#', '');
-    if (h.length == 6) h = 'FF$h';
-    if (h.length != 8) return null;
-    return Color(int.parse(h, radix: 16));
-  }
-
-  static const _hidden = TextStyle(
-    fontSize: 0.01,
-    height: 0.01,
-    color: Colors.transparent,
-  );
-
-  static String? fontFamilyFor(String? f) => switch (f) {
-        null => null,
-        'Lora' => 'Lora',
-        'LibreBaskerville' => 'LibreBaskerville',
-        'DMSans' || 'Sans' => 'DMSans',
-        'NotoNaskhArabic' || 'Naskh' => 'NotoNaskhArabic',
-        _ => f,
-      };
-
-  @override
-  TextSpan buildTextSpan({
-    required BuildContext context,
-    TextStyle? style,
-    required bool withComposing,
-  }) {
-    final base = style ?? const TextStyle(fontSize: 16, color: Color(0xFF1A1A1A));
-    final fs = base.fontSize ?? 16;
-    final p = RichMarkup.parse(text);
-    final children = <InlineSpan>[];
-    // Line styles.
-    final lineStyles = <TextStyle>[];
-    final hides = <int>[];
-    for (final line in text.split('\n')) {
-      var ls = base;
-      var hide = 0;
-      if (line.startsWith('### ')) {
-        hide = 4;
-        ls = base.copyWith(fontSize: fs * 1.05, fontWeight: FontWeight.w700, height: 1.25);
-      } else if (line.startsWith('## ')) {
-        hide = 3;
-        ls = base.copyWith(fontSize: fs * 1.22, fontWeight: FontWeight.w700, height: 1.25);
-      } else if (line.startsWith('# ')) {
-        hide = 2;
-        ls = base.copyWith(fontSize: fs * 1.55, fontWeight: FontWeight.w700, height: 1.2);
-      } else if (line.startsWith('> ')) {
-        hide = 2;
-        ls = base.copyWith(fontStyle: FontStyle.italic, color: const Color(0xFF424242));
-      } else if (RegExp(r'^\[\^\d+\]:').hasMatch(line)) {
-        ls = base.copyWith(fontSize: fs * 0.72, height: 1.25, color: const Color(0xFF333333));
-      }
-      lineStyles.add(ls);
-      hides.add(hide);
-    }
-    var line = 0, lineStart = 0, raw = 0;
-    void hidden(int upto) {
-      if (upto > raw) children.add(TextSpan(text: text.substring(raw, upto), style: _hidden));
-      raw = upto;
-    }
-
-    for (var k = 0; k < p.length; k++) {
-      final rs = p.rs[k];
-      hidden(rs);
-      final e = p.el[k];
-      if (e == '\n') {
-        children.add(TextSpan(text: '\n', style: lineStyles[line]));
-        raw = p.re[k];
-        line++;
-        lineStart = raw;
-        continue;
-      }
-      final ls = lineStyles[line];
-      if (rs - lineStart < hides[line]) {
-        children.add(TextSpan(text: e, style: _hidden));
-        raw = p.re[k];
-        continue;
-      }
-      if (p.isLink(k)) {
-        final (lt, url) = ParsedMarkup.linkParts(e);
-        children.add(const TextSpan(text: '[', style: _hidden));
-        children.add(TextSpan(
-          text: lt,
-          style: ls.copyWith(color: const Color(0xFF175CD3), decoration: TextDecoration.underline),
-        ));
-        children.add(TextSpan(text: '](' + url + ')', style: _hidden));
-        raw = p.re[k];
-        continue;
-      }
-      if (p.isFootnote(k)) {
-        children.add(const TextSpan(text: '[^', style: _hidden));
-        children.add(TextSpan(
-          text: e.substring(2, e.length - 1),
-          style: ls.copyWith(fontSize: fs * 0.62, fontWeight: FontWeight.w700, color: const Color(0xFF8C1C13), height: 1),
-        ));
-        children.add(const TextSpan(text: ']', style: _hidden));
-        raw = p.re[k];
-        continue;
-      }
-      final sp = p.st[k];
-      final deco = <TextDecoration>[
-        if (sp.underline) TextDecoration.underline,
-        if (sp.strike) TextDecoration.lineThrough,
-      ];
-      final ts = ls.copyWith(
-        fontWeight: sp.bold ? FontWeight.w700 : null,
-        fontStyle: sp.italic ? FontStyle.italic : null,
-        decoration: deco.isEmpty ? null : TextDecoration.combine(deco),
-        color: _hex(sp.color),
-        backgroundColor: _hex(sp.bg),
-        fontSize: sp.size?.toDouble(),
-        fontFamily: fontFamilyFor(sp.font),
-      );
-      // Merge with the previous span when the style is identical.
-      if (children.isNotEmpty && children.last is TextSpan && (children.last as TextSpan).style == ts) {
-        final last = children.removeLast() as TextSpan;
-        children.add(TextSpan(text: (last.text ?? '') + e, style: ts));
-      } else {
-        children.add(TextSpan(text: e, style: ts));
-      }
-      raw = p.re[k];
-    }
-    hidden(text.length);
-    return TextSpan(style: base, children: children);
-  }
+  MarkupTextController({super.text});
+  static ValueNotifier<SpanStyle> get caret => RichController.caret;
+  static String? fontFamilyFor(String? f) => RichController.fontFamilyFor(f);
 }
