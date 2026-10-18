@@ -245,4 +245,17 @@ void main() {
       expect(find.text('Şəkil 1'), findsOneWidget);
     }
   });
+
+  testWidgets('book sections: dedication/epigraph print no raw markers', (t) async {
+    const text = '\n\n[align=center]*Anama*\n\n--- Page Break ---\n\n[align=right]> “Söz gümüşdür.”\n[align=right]> — Atalar sözü\n\n--- Page Break ---\n\n# Ön söz\n\n';
+    final doc = await layout(t, text);
+    final words = [for (final p in doc.pages) for (final l in p.lines) for (final w in l.words) w];
+    expect(words.any((w) => w.text.contains('>') || w.text.contains('[align') || w.text.contains('*')), isFalse);
+    final ded = words.firstWhere((w) => w.text == 'Anama');
+    expect(ded.style.italic, isTrue);
+    expect(ded.x + ded.width / 2, closeTo(settings.pageW / 2, 0.6));
+    final src = doc.pages[1].lines.last.words.last;
+    expect(src.x + src.width, closeTo(settings.pageW - settings.margin, 0.6));
+    expect(doc.toc.single.title, 'Ön söz');
+  });
 }

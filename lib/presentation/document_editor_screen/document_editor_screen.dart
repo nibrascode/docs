@@ -2262,14 +2262,51 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
     });
   }
 
-  void _insertDedication() {
-    _insertAtCursor('\n# Dedication\n\nFor …\n\n--- Page Break ---\n\n');
+  String _l(String az, String en, String ru, String ar) =>
+      AppLocalizations.of(context).t(az: az, en: en, ru: ru, ar: ar);
+
+  /// Small two-field prompt (text + optional second line).
+  Future<(String, String)?> _askTwo(String title, String hint1, String hint2) async {
+    final a = TextEditingController();
+    final b = TextEditingController();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(title),
+        content: Column(mainAxisSize: MainAxisSize.min, children: [
+          TextField(controller: a, autofocus: true, maxLines: 3, decoration: InputDecoration(hintText: hint1)),
+          if (hint2.isNotEmpty) TextField(controller: b, decoration: InputDecoration(hintText: hint2)),
+        ]),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(_l('Ləğv', 'Cancel', 'Отмена', 'إلغاء'))),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text(_l('Əlavə et', 'Insert', 'Вставить', 'إدراج'))),
+        ],
+      ),
+    );
+    final r = (a.text.trim().replaceAll('\n', ' '), b.text.trim());
+    a.dispose();
+    b.dispose();
+    return ok == true && r.$1.isNotEmpty ? r : null;
   }
 
-  void _insertEpigraph() {
-    _insertAtCursor(
-      '\n> “Quote goes here.”\n>\n> — Author, *Work*\n\n--- Page Break ---\n\n',
-    );
+  /// Dedication: centred italic text on its own page (no heading, like
+  /// printed books).
+  Future<void> _insertDedication() async {
+    _syncCursorFromCanvas();
+    final r = await _askTwo(_l('İthaf', 'Dedication', 'Посвящение', 'إهداء'),
+        _l('Məsələn: Anama', 'e.g. For my mother', 'Например: Маме', 'مثال: إلى أمي'), '');
+    if (r == null) return;
+    _insertAtCursor('\n\n[align=center]*${r.$1}*\n\n--- Page Break ---\n\n');
+  }
+
+  /// Epigraph: right-aligned quotation with its source.
+  Future<void> _insertEpigraph() async {
+    _syncCursorFromCanvas();
+    final r = await _askTwo(_l('Epiqraf', 'Epigraph', 'Эпиграф', 'تصدير'),
+        _l('Sitat', 'Quotation', 'Цитата', 'الاقتباس'), _l('Müəllif, əsər', 'Author, work', 'Автор, произведение', 'المؤلف، العمل'));
+    if (r == null) return;
+    final src = r.$2.isEmpty ? '' : '\n[align=right]> — ${r.$2}';
+    _insertAtCursor('\n\n[align=right]> “${r.$1}”$src\n\n--- Page Break ---\n\n');
   }
 
   void _insertPart() {
@@ -2428,15 +2465,15 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
   void _insertCopyright() {
     final year = DateTime.now().year;
     final author = _docSettings.author.trim().isEmpty
-        ? '[Müəllif]'
+        ? _l('Müəllif', 'The author', 'Автор', 'المؤلف')
         : _docSettings.author.trim();
     final pub = _docSettings.publisher.trim();
     final isbn = _docSettings.isbn.trim();
     final buf = StringBuffer()
       ..writeln()
-      ..writeln('# Copyright')
+      ..writeln('# ${_l('Müəllif hüquqları', 'Copyright', 'Авторские права', 'حقوق النشر')}')
       ..writeln()
-      ..writeln('© $year $author. All rights reserved.')
+      ..writeln('© $year $author. ${_l('Bütün hüquqlar qorunur.', 'All rights reserved.', 'Все права защищены.', 'جميع الحقوق محفوظة.')}')
       ..writeln()
       ..writeln(
         'Bu əsərin heç bir hissəsi müəllifin yazılı icazəsi olmadan çoxaldıla, yayıla və ya saxlana bilməz.',
@@ -2448,64 +2485,32 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
     _insertAtCursor(buf.toString());
   }
 
+  /// A titled book section: real heading (in the TOC), an empty paragraph
+  /// with the cursor in it, then a page break. No placeholder text that
+  /// would end up printed.
   void _insertBookSection({
     required String heading,
-    required String body,
     bool pageBreakAfter = true,
   }) {
     final pb = pageBreakAfter ? '\n\n--- Page Break ---\n\n' : '\n\n';
-    _insertAtCursor('\n# $heading\n\n$body$pb');
+    final head = '\n# $heading\n\n';
+    _insertAtCursor('$head$pb');
+    final at = _bodyCtrl.selection.start - pb.length;
+    _bodyCtrl.selection = TextSelection.collapsed(offset: at.clamp(0, _bodyCtrl.text.length));
   }
 
-  void _insertPrologue() {
-    _insertBookSection(
-      heading: 'Prologue',
-      body: 'Hadisədən əvvəl oxucunun bilməli olduğu səhnə. Qısa saxla.',
-    );
-  }
-
-  void _insertEpilogue() {
-    _insertBookSection(
-      heading: 'Epilogue',
-      body: 'Hekayədən sonra. Personajın yeni həyatını bir şəkillə bağla.',
-    );
-  }
-
-  void _insertPreface() {
-    _insertBookSection(
-      heading: 'Preface',
-      body:
-          'Niyə bu kitabı yazırsan. Oxucu nə öyrənəcək. Təşəkkürləri Acknowledgements-ə saxla.',
-    );
-  }
-
-  void _insertAfterword() {
-    _insertBookSection(
-      heading: 'Afterword',
-      body: 'Yazı prosesi, mənbələr, oxucuya son söz.',
-    );
-  }
-
-  void _insertAcknowledgements() {
-    _insertBookSection(
-      heading: 'Acknowledgements',
-      body: 'Bu kitabı mümkün edənlərə:\n\n- \n- \n\nOxuculara təşəkkür.',
-    );
-  }
-
-  void _insertAboutAuthor() {
-    final author = _docSettings.author.trim().isEmpty
-        ? '[Müəllif]'
-        : _docSettings.author.trim();
-    _insertBookSection(
-      heading: 'About the Author',
-      body: '$author …\n\nHarada yaşayır, nə yazır, növbəti kitab.\n\nƏlaqə: ',
-    );
-  }
+  void _insertPrologue() => _insertBookSection(heading: _l('Proloq', 'Prologue', 'Пролог', 'تمهيد'));
+  void _insertEpilogue() => _insertBookSection(heading: _l('Epiloq', 'Epilogue', 'Эпилог', 'خاتمة'));
+  void _insertPreface() => _insertBookSection(heading: _l('Ön söz', 'Preface', 'Предисловие', 'مقدمة'));
+  void _insertAfterword() => _insertBookSection(heading: _l('Son söz', 'Afterword', 'Послесловие', 'كلمة ختامية'));
+  void _insertAcknowledgements() =>
+      _insertBookSection(heading: _l('Təşəkkür', 'Acknowledgements', 'Благодарности', 'شكر وتقدير'));
+  void _insertAboutAuthor() =>
+      _insertBookSection(heading: _l('Müəllif haqqında', 'About the Author', 'Об авторе', 'عن المؤلف'));
 
   void _insertGlossary() {
     _insertAtCursor(
-      '\n# Glossary\n\n'
+      '\n# ${_l('Lüğət', 'Glossary', 'Глоссарий', 'مسرد')}\n\n'
       '${TableBlock.markupFrom(rows: 8, cols: 2, headers: ['Term', 'İzah'], caption: 'Lüğət')}\n'
       '--- Page Break ---\n\n',
     );
@@ -2513,7 +2518,7 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
 
   void _insertBibliography() {
     _insertAtCursor(
-      '\n# Bibliography\n\n'
+      '\n# ${_l('Ədəbiyyat', 'Bibliography', 'Библиография', 'المراجع')}\n\n'
       '${TableBlock.markupFrom(rows: 7, cols: 4, headers: ['Müəllif', 'Əsər', 'İl', 'Qeyd'], caption: 'Mənbələr')}\n'
       '--- Page Break ---\n\n',
     );
