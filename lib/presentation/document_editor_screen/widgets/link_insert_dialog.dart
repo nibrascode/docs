@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../../../l10n/ui_strings.dart';
 
 class LinkInsertDialog extends StatefulWidget {
   final String selected;
@@ -39,7 +40,7 @@ class _LinkInsertDialogState extends State<LinkInsertDialog> {
   Widget build(BuildContext context) {
     return AlertDialog(
       title: Text(
-        'Insert link',
+        tr('Insert link'),
         style: GoogleFonts.dmSans(fontWeight: FontWeight.w700),
       ),
       content: Column(
@@ -47,9 +48,9 @@ class _LinkInsertDialogState extends State<LinkInsertDialog> {
         children: [
           TextField(
             controller: _text,
-            decoration: const InputDecoration(
-              labelText: 'Display text',
-              hintText: 'Click here',
+            decoration: InputDecoration(
+              labelText: tr('Display text'),
+              hintText: tr('Click here'),
             ),
           ),
           const SizedBox(height: 12),
@@ -66,7 +67,7 @@ class _LinkInsertDialogState extends State<LinkInsertDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('Cancel'),
+          child: Text(tr('Cancel')),
         ),
         FilledButton(
           onPressed: () {
@@ -76,13 +77,13 @@ class _LinkInsertDialogState extends State<LinkInsertDialog> {
             final url = _url.text.trim();
             if (url.isEmpty || url == 'https://') {
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Enter a valid URL')),
+                SnackBar(content: Text(tr('Enter a valid URL'))),
               );
               return;
             }
             Navigator.pop(context, '[$label]($url)');
           },
-          child: const Text('Insert'),
+          child: Text(tr('Insert')),
         ),
       ],
     );

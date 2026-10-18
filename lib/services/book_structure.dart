@@ -1,3 +1,5 @@
+import '../l10n/ui_strings.dart';
+
 /// Chapter / heading ranges for a manuscript (H1–H6).
 class BookSection {
   final int index;
@@ -68,7 +70,7 @@ class BookStructure {
         level: level,
         start: m.start,
         end: end,
-        title: title.isEmpty ? 'Başlıqsız' : title,
+        title: title.isEmpty ? tr('Başlıqsız') : title,
         headingRaw: m.group(0)!,
       ));
     }
@@ -149,7 +151,7 @@ class BookStructure {
     if (sectionIndex < 0 || sectionIndex >= all.length) return text;
     final s = all[sectionIndex];
     final hashes = '#' * s.level;
-    final title = newTitle.trim().isEmpty ? 'Başlıqsız' : newTitle.trim();
+    final title = newTitle.trim().isEmpty ? tr('Başlıqsız') : newTitle.trim();
     return text.replaceRange(
       s.start,
       s.start + s.headingRaw.length,
@@ -198,6 +200,12 @@ class BookStructure {
     return renumber(text.substring(0, at) + snippet + text.substring(at));
   }
 
+  /// Planning-table captions in every UI language (inserted via tr()).
+  static final Set<String> _localCaptions = {
+    for (final k in const ['Personajlar', 'Məkanlar', 'Xronologiya', 'Səhnə siyahısı', 'Fəsil planı', 'Tədqiqat'])
+      ...trAll(k).map((v) => v.toLowerCase()),
+  };
+
   static bool _isPlanningTable(String block) {
     final cap = RegExp(r'\[CAP\](.*)$', multiLine: true)
             .firstMatch(block)
@@ -205,10 +213,9 @@ class BookStructure {
             ?.trim()
             .toLowerCase() ??
         '';
-    if (planningCaptions.contains(cap)) return true;
-    if (block.contains('| İstək |') ||
-        block.contains('| Qüsur |') ||
-        block.contains('| POV |') && block.contains('| Konflikt |')) {
+    if (planningCaptions.contains(cap) || _localCaptions.contains(cap)) return true;
+    bool has(String k) => trAll(k).any((v) => block.contains('| $v |'));
+    if (has('İstək') || has('Qüsur') || block.contains('| POV |') && has('Konflikt')) {
       return true;
     }
     return false;
@@ -222,7 +229,8 @@ class BookStructure {
     );
     s = s.replaceAll(
       RegExp(
-        r'## Səhnə\n+\*\*POV:\*\*[\s\S]*?\*\*Nəticə:\*\*[^\n]*\n*',
+        '## (?:${trAll('Səhnə').map(RegExp.escape).join('|')})\\n+\\*\\*POV:\\*\\*[\\s\\S]*?'
+        '\\*\\*(?:${trAll('Nəticə').map(RegExp.escape).join('|')}):\\*\\*[^\\n]*\\n*',
       ),
       '\n',
     );

@@ -1,3 +1,4 @@
+import '../l10n/ui_strings.dart';
 import 'rich_markup.dart';
 
 /// One table-of-contents entry: heading level (1-3), plain title, printed
@@ -18,7 +19,7 @@ class TocSpec {
   static const double titleScale = 1.3;
   static const double indentPerLevel = 14.0; // pt
   static const double entryGap = 2.0; // pt extra below each entry
-  static const String defaultTitle = 'Mündəricat';
+  static String get defaultTitle => tr('Mündəricat');
 
   static int levelOf(String line) {
     if (line.startsWith('### ')) return 3;

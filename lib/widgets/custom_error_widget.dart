@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/svg.dart';
 
 import '../core/app_export.dart';
+import '../l10n/ui_strings.dart';
 
 // custom_error_widget.dart
 
@@ -40,8 +41,8 @@ class CustomErrorWidget extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 SizedBox(
-                  child: const Text(
-                    'We encountered an unexpected error while processing your request.',
+                  child: Text(
+                    tr('We encountered an unexpected error while processing your request.'),
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 16,
@@ -64,7 +65,7 @@ class CustomErrorWidget extends StatelessWidget {
                     size: 18,
                     color: Colors.white,
                   ),
-                  label: const Text('Back'),
+                  label: Text(tr('Back')),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: theme.primaryColor,
                     foregroundColor: Colors.white,

@@ -15,6 +15,7 @@ import '../../../core/toc.dart';
 import '../../../core/page_layout.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../services/mobile_export_service.dart';
+import '../../../l10n/ui_strings.dart';
 
 enum DocBlockKind { text, table, image, pageBreak, sceneBreak, hr, note, cover, toc }
 
@@ -712,7 +713,7 @@ class DocumentCanvasState extends State<DocumentCanvas> {
               child: _ParagraphEditor(
                 master: nctrl,
                 readOnly: widget.readOnly,
-                hint: 'Kənar qeyd yazın…',
+                hint: tr('Kənar qeyd yazın…'),
                 firstLineIndent: false,
                 style: widget.style.copyWith(
                   fontSize: (widget.style.fontSize ?? 14) * 0.9,
@@ -885,7 +886,7 @@ class DocumentCanvasState extends State<DocumentCanvas> {
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 8),
                     child: Text(
-                      'Səhifə sonu',
+                      tr('Səhifə sonu'),
                       style: GoogleFonts.dmSans(
                         fontSize: 11,
                         color: const Color(0xFFC9A84C),
@@ -1365,7 +1366,7 @@ class _VisualTableState extends State<_VisualTable> {
         ScaffoldMessenger.maybeOf(context)?.showSnackBar(
           SnackBar(
             content: Text(
-              '${grid.length}×${grid.first.length} xana yapışdırıldı',
+              trf('{r}×{c} xana yapışdırıldı', {'r': grid.length, 'c': grid.first.length}),
             ),
             duration: const Duration(seconds: 2),
           ),
@@ -1386,8 +1387,8 @@ class _VisualTableState extends State<_VisualTable> {
     }
     Clipboard.setData(ClipboardData(text: buf.toString()));
     ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-      const SnackBar(
-        content: Text('Cədvəl kopyalandı — Excel / Sheets-ə yapışdırın'),
+      SnackBar(
+        content: Text(tr('Cədvəl kopyalandı — Excel / Sheets-ə yapışdırın')),
         duration: Duration(seconds: 2),
       ),
     );
@@ -1807,10 +1808,10 @@ class _VisualTableState extends State<_VisualTable> {
               color: const Color(0xFF5A6A8A),
             ),
             textAlign: TextAlign.center,
-            decoration: const InputDecoration(
+            decoration: InputDecoration(
               isDense: true,
               border: InputBorder.none,
-              hintText: 'Cədvəl başlığı',
+              hintText: tr('Cədvəl başlığı'),
               hintStyle: TextStyle(fontSize: 12, color: Colors.black26),
             ),
             onChanged: widget.onCaptionChanged,

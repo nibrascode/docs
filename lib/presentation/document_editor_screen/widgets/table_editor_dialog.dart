@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../../../l10n/ui_strings.dart';
 
 /// Parses [TABLE]...[/TABLE] blocks from document text.
 class TableBlock {
@@ -131,7 +132,7 @@ class TableBlock {
     String caption = '',
     int extraRows = 0,
   }) {
-    final h = headers ?? List.generate(cols, (c) => 'Başlıq ${c + 1}');
+    final h = headers ?? List.generate(cols, (c) => trf('Başlıq {n}', {'n': c + 1}));
     final cCount = h.length;
     final rCount = extraRows > 0 ? extraRows + 1 : rows;
     final cells = List.generate(
@@ -275,7 +276,7 @@ class _TableSizePickerSheetState extends State<_TableSizePickerSheet> {
             ),
             const SizedBox(height: 16),
             Text(
-              'Cədvəl daxil et',
+              tr('Cədvəl daxil et'),
               style: GoogleFonts.dmSans(
                 fontSize: 18,
                 fontWeight: FontWeight.w700,
@@ -284,7 +285,7 @@ class _TableSizePickerSheetState extends State<_TableSizePickerSheet> {
             ),
             const SizedBox(height: 4),
             Text(
-              '$hoverR sətir × $hoverC sütun  ·  xanaya toxun',
+              trf('{r} sətir × {c} sütun  ·  xanaya toxun', {'r': hoverR, 'c': hoverC}),
               style: GoogleFonts.dmSans(fontSize: 13, color: const Color(0xFFC9A84C)),
             ),
             const SizedBox(height: 14),
@@ -375,7 +376,7 @@ class _TableSizePickerSheetState extends State<_TableSizePickerSheet> {
                 ),
                 icon: const Icon(Icons.grid_on, color: Color(0xFFC9A84C)),
                 label: Text(
-                  'Özəl ölçü / başlıqları yaz',
+                  tr('Özəl ölçü / başlıqları yaz'),
                   style: GoogleFonts.dmSans(color: Colors.white),
                 ),
                 style: OutlinedButton.styleFrom(
@@ -477,7 +478,7 @@ class _TableEditorDialogState extends State<TableEditorDialog> {
       return List.generate(_cols, (c) {
         final text = (data != null && r < data.length && c < data[r].length)
             ? data[r][c]
-            : (r == 0 ? 'Başlıq ${c + 1}' : '');
+            : (r == 0 ? trf('Başlıq {n}', {'n': c + 1}) : '');
         return TextEditingController(text: text);
       });
     });
@@ -643,7 +644,7 @@ class _TableEditorDialogState extends State<TableEditorDialog> {
             child: Row(
               children: [
                 Text(
-                  widget.editing ? 'Cədvəli redaktə et' : 'Cədvəl daxil et',
+                  widget.editing ? tr('Cədvəli redaktə et') : tr('Cədvəl daxil et'),
                   style: GoogleFonts.dmSans(
                     fontSize: 18,
                     fontWeight: FontWeight.w700,
@@ -663,12 +664,12 @@ class _TableEditorDialogState extends State<TableEditorDialog> {
             padding: const EdgeInsets.symmetric(horizontal: 12),
             child: Row(
               children: [
-                _chip(Icons.add, 'Sətir+', () => _insertRow(_selectedRow + 1)),
-                _chip(Icons.remove, 'Sətir−', () => _deleteRow(_selectedRow)),
-                _chip(Icons.view_column, 'Sütun+', () => _insertCol(_selectedCol + 1)),
-                _chip(Icons.view_column_outlined, 'Sütun−', () => _deleteCol(_selectedCol)),
-                _chip(Icons.clear, 'Xananı sil', _clearSelected),
-                _chip(Icons.content_paste, 'Yapışdır', _pasteGrid),
+                _chip(Icons.add, tr('Sətir+'), () => _insertRow(_selectedRow + 1)),
+                _chip(Icons.remove, tr('Sətir−'), () => _deleteRow(_selectedRow)),
+                _chip(Icons.view_column, tr('Sütun+'), () => _insertCol(_selectedCol + 1)),
+                _chip(Icons.view_column_outlined, tr('Sütun−'), () => _deleteCol(_selectedCol)),
+                _chip(Icons.clear, tr('Xananı sil'), _clearSelected),
+                _chip(Icons.content_paste, tr('Yapışdır'), _pasteGrid),
                 _chip(Icons.unfold_more, '$_rows×$_cols', () {}),
               ],
             ),
@@ -677,7 +678,7 @@ class _TableEditorDialogState extends State<TableEditorDialog> {
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
             child: Row(
               children: [
-                Text('Sətir', style: GoogleFonts.dmSans(color: Colors.white70, fontSize: 12)),
+                Text(tr('Sətir'), style: GoogleFonts.dmSans(color: Colors.white70, fontSize: 12)),
                 Expanded(
                   child: Slider(
                     value: _rows.toDouble().clamp(1, 40),
@@ -688,7 +689,7 @@ class _TableEditorDialogState extends State<TableEditorDialog> {
                     onChanged: (v) => _resize(v.round(), _cols),
                   ),
                 ),
-                Text('Sütun', style: GoogleFonts.dmSans(color: Colors.white70, fontSize: 12)),
+                Text(tr('Sütun'), style: GoogleFonts.dmSans(color: Colors.white70, fontSize: 12)),
                 Expanded(
                   child: Slider(
                     value: _cols.toDouble().clamp(1, 12),
@@ -705,7 +706,7 @@ class _TableEditorDialogState extends State<TableEditorDialog> {
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
             child: Text(
-              'Xana S${_selectedRow + 1} C${_selectedCol + 1} · toxun və yaz · sürgü = sütun eni',
+              trf('Xana S{r} C{c} · toxun və yaz · sürgü = sütun eni', {'r': _selectedRow + 1, 'c': _selectedCol + 1}),
               style: GoogleFonts.dmSans(fontSize: 11, color: Colors.white54),
             ),
           ),
@@ -714,7 +715,7 @@ class _TableEditorDialogState extends State<TableEditorDialog> {
             child: Row(
               children: [
                 Text(
-                  'Sütun eni',
+                  tr('Sütun eni'),
                   style: GoogleFonts.dmSans(color: Colors.white70, fontSize: 12),
                 ),
                 Expanded(
@@ -783,7 +784,7 @@ class _TableEditorDialogState extends State<TableEditorDialog> {
                             decoration: InputDecoration(
                               isDense: true,
                               border: InputBorder.none,
-                              hintText: r == 0 ? 'Başlıq' : 'Yaz…',
+                              hintText: r == 0 ? tr('Başlıq') : 'Yaz…',
                               hintStyle: const TextStyle(
                                 color: Colors.white30,
                                 fontSize: 12,
@@ -808,7 +809,7 @@ class _TableEditorDialogState extends State<TableEditorDialog> {
               controller: _caption,
               style: const TextStyle(color: Colors.white),
               decoration: InputDecoration(
-                hintText: 'Cədvəl başlığı (məs. Cədvəl 1. Personajlar)',
+                hintText: tr('Cədvəl başlığı (məs. Cədvəl 1. Personajlar)'),
                 hintStyle: const TextStyle(color: Colors.white38, fontSize: 13),
                 filled: true,
                 fillColor: const Color(0xFF1A1A1A),
@@ -828,7 +829,7 @@ class _TableEditorDialogState extends State<TableEditorDialog> {
                   onPressed: () => Navigator.pop(context, _toMarkup()),
                   icon: const Icon(Icons.check),
                   label: Text(
-                    widget.editing ? 'Cədvəli yenilə' : 'Cədvəli daxil et',
+                    widget.editing ? tr('Cədvəli yenilə') : tr('Cədvəli daxil et'),
                     style: GoogleFonts.dmSans(fontWeight: FontWeight.w600),
                   ),
                   style: FilledButton.styleFrom(

@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/page_size.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../../l10n/ui_strings.dart';
 
 TextStyle _serif({
   double? fontSize,
@@ -1499,7 +1500,7 @@ class _CoverGalleryBodyState extends State<_CoverGalleryBody> {
                         ),
                         const SizedBox(height: 6),
                         Text(
-                          t.name,
+                          tr(t.name),
                           style: _sans(
                             color: Colors.white70,
                             fontSize: 12,
@@ -1644,7 +1645,7 @@ class _CoverEditorState extends State<_CoverEditor> {
               ),
               Expanded(
                 child: Text(
-                  '${widget.template.name} · ${widget.pageSize.label}',
+                  '${tr(widget.template.name)} · ${widget.pageSize.label}',
                   style: _sans(
                     color: Colors.white,
                     fontWeight: FontWeight.w700,
@@ -1654,7 +1655,7 @@ class _CoverEditorState extends State<_CoverEditor> {
               ),
               TextButton(
                 onPressed: () => widget.onApply(_now()),
-                child: const Text('Tətbiq et'),
+                child: Text(tr('Tətbiq et')),
               ),
             ],
           ),
@@ -1679,22 +1680,22 @@ class _CoverEditorState extends State<_CoverEditor> {
               ),
               const SizedBox(height: 16),
               Text(
-                'Bu ${widget.pageSize.label} səhifənin real nisbətidir. Yazını dəyiş.',
+                trf('Bu {size} səhifənin real nisbətidir. Yazını dəyiş.', {'size': widget.pageSize.label}),
                 style: _sans(color: Colors.white54, fontSize: 12),
               ),
               const SizedBox(height: 12),
-              _field('Kitabın adı', _title),
-              _field('Alt başlıq', _sub),
-              _field('Müəllif', _author),
-              _field('İl', _year),
-              _field('Nəşriyyat', _pub),
+              _field(tr('Kitabın adı'), _title),
+              _field(tr('Alt başlıq'), _sub),
+              _field(tr('Müəllif'), _author),
+              _field(tr('İl'), _year),
+              _field(tr('Nəşriyyat'), _pub),
               const SizedBox(height: 8),
-              Text('Yazının yeri', style: _sans(color: Colors.white70, fontSize: 12)),
+              Text(tr('Yazının yeri'), style: _sans(color: Colors.white70, fontSize: 12)),
               const SizedBox(height: 6),
               Wrap(
                 spacing: 8,
                 children: [
-                  for (final e in [('top', 'Üst'), ('middle', 'Orta'), ('bottom', 'Alt')])
+                  for (final e in [('top', tr('Üst')), ('middle', tr('Orta')), ('bottom', tr('Alt'))])
                     ChoiceChip(
                       label: Text(e.$2),
                       selected: _place == e.$1,
@@ -1706,12 +1707,12 @@ class _CoverEditorState extends State<_CoverEditor> {
                 ],
               ),
               const SizedBox(height: 10),
-              Text('Ölçü', style: _sans(color: Colors.white70, fontSize: 12)),
+              Text(tr('Ölçü'), style: _sans(color: Colors.white70, fontSize: 12)),
               const SizedBox(height: 6),
               Wrap(
                 spacing: 8,
                 children: [
-                  for (final e in [(0.85, 'Kiçik'), (1.0, 'Orta'), (1.3, 'Böyük'), (1.6, 'Çox böyük')])
+                  for (final e in [(0.85, tr('Kiçik')), (1.0, tr('Orta')), (1.3, tr('Böyük')), (1.6, tr('Çox böyük'))])
                     ChoiceChip(
                       label: Text(e.$2),
                       selected: (_scale - e.$1).abs() < 0.05,
@@ -1723,7 +1724,7 @@ class _CoverEditorState extends State<_CoverEditor> {
                 ],
               ),
               const SizedBox(height: 10),
-              Text('Yazı rəngi', style: _sans(color: Colors.white70, fontSize: 12)),
+              Text(tr('Yazı rəngi'), style: _sans(color: Colors.white70, fontSize: 12)),
               const SizedBox(height: 6),
               Wrap(
                 spacing: 8,

@@ -7,6 +7,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../theme/app_theme.dart';
 import '../../routes/app_routes.dart';
+import '../../l10n/ui_strings.dart';
 
 class AuthScreen extends StatefulWidget {
   const AuthScreen({super.key});
@@ -114,7 +115,7 @@ class _AuthScreenState extends State<AuthScreen> {
               ),
               const SizedBox(height: 6),
               Text(
-                _isLogin ? 'Hesabınıza daxil olun' : 'Yeni hesab yaradın',
+                _isLogin ? tr('Hesabınıza daxil olun') : tr('Yeni hesab yaradın'),
                 style: GoogleFonts.dmSans(
                   fontSize: 14,
                   color: theme.colorScheme.onSurfaceVariant,
@@ -131,7 +132,7 @@ class _AuthScreenState extends State<AuthScreen> {
                       keyboardType: TextInputType.emailAddress,
                       style: GoogleFonts.dmSans(fontSize: 14),
                       decoration: InputDecoration(
-                        labelText: 'E-poçt',
+                        labelText: tr('E-poçt'),
                         prefixIcon: const Icon(Icons.email_outlined, size: 20),
                         filled: true,
                         fillColor: theme.colorScheme.surface,
@@ -161,9 +162,9 @@ class _AuthScreenState extends State<AuthScreen> {
                       ),
                       validator: (v) {
                         if (v == null || v.trim().isEmpty) {
-                          return 'E-poçt daxil edin';
+                          return tr('E-poçt daxil edin');
                         }
-                        if (!v.contains('@')) return 'Düzgün e-poçt daxil edin';
+                        if (!v.contains('@')) return tr('Düzgün e-poçt daxil edin');
                         return null;
                       },
                     ),
@@ -174,7 +175,7 @@ class _AuthScreenState extends State<AuthScreen> {
                       obscureText: _obscurePassword,
                       style: GoogleFonts.dmSans(fontSize: 14),
                       decoration: InputDecoration(
-                        labelText: 'Şifrə',
+                        labelText: tr('Şifrə'),
                         prefixIcon: const Icon(Icons.lock_outline, size: 20),
                         suffixIcon: IconButton(
                           icon: Icon(
@@ -214,9 +215,9 @@ class _AuthScreenState extends State<AuthScreen> {
                         ),
                       ),
                       validator: (v) {
-                        if (v == null || v.isEmpty) return 'Şifrə daxil edin';
+                        if (v == null || v.isEmpty) return tr('Şifrə daxil edin');
                         if (v.length < 6) {
-                          return 'Şifrə ən az 6 simvol olmalıdır';
+                          return tr('Şifrə ən az 6 simvol olmalıdır');
                         }
                         return null;
                       },
@@ -285,8 +286,8 @@ class _AuthScreenState extends State<AuthScreen> {
                       children: [
                         Text(
                           _isLogin
-                              ? 'Hesabınız yoxdur? '
-                              : 'Artıq hesabınız var? ',
+                              ? tr('Hesabınız yoxdur? ')
+                              : tr('Artıq hesabınız var? '),
                           style: GoogleFonts.dmSans(
                             fontSize: 13,
                             color: theme.colorScheme.onSurfaceVariant,
@@ -321,7 +322,7 @@ class _AuthScreenState extends State<AuthScreen> {
                         Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 12),
                           child: Text(
-                            'və ya',
+                            tr('və ya'),
                             style: GoogleFonts.dmSans(
                               fontSize: 12,
                               color: theme.colorScheme.onSurfaceVariant,
@@ -349,7 +350,7 @@ class _AuthScreenState extends State<AuthScreen> {
                           color: theme.colorScheme.onSurfaceVariant,
                         ),
                         label: Text(
-                          'Qeydiyyatsız davam et',
+                          tr('Qeydiyyatsız davam et'),
                           style: GoogleFonts.dmSans(
                             fontSize: 15,
                             fontWeight: FontWeight.w500,
@@ -368,7 +369,7 @@ class _AuthScreenState extends State<AuthScreen> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'Qeydiyyat olmadan sənədlər yalnız bu cihazda saxlanılır',
+                      tr('Qeydiyyat olmadan sənədlər yalnız bu cihazda saxlanılır'),
                       textAlign: TextAlign.center,
                       style: GoogleFonts.dmSans(
                         fontSize: 11,

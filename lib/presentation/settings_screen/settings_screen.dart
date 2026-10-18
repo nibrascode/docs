@@ -10,6 +10,7 @@ import '../../services/doc_import_service.dart';
 import '../../services/local_docs_cache.dart';
 import '../../services/mobile_export_service.dart';
 import '../../widgets/language_selector_widget.dart';
+import '../../l10n/ui_strings.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -161,7 +162,7 @@ class SettingsScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 16),
-          const Column(
+          Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
@@ -174,7 +175,7 @@ class SettingsScreen extends StatelessWidget {
               ),
               SizedBox(height: 4),
               Text(
-                'Sənəd idarəetmə platforması',
+                tr('Sənəd idarəetmə platforması'),
                 style: TextStyle(color: Color(0xFF8899BB), fontSize: 13),
               ),
             ],
@@ -290,8 +291,8 @@ class SettingsScreen extends StatelessWidget {
           } catch (_) {}
           if (context.mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Çıxış edildi. Sənədlər bu cihazda qalır.'),
+              SnackBar(
+                content: Text(tr('Çıxış edildi. Sənədlər bu cihazda qalır.')),
                 behavior: SnackBarBehavior.floating,
               ),
             );
@@ -306,16 +307,16 @@ class SettingsScreen extends StatelessWidget {
           ),
           child: const Icon(Icons.logout_rounded, color: Colors.red, size: 20),
         ),
-        title: const Text(
-          'Çıxış',
+        title: Text(
+          tr('Çıxış'),
           style: TextStyle(
             color: Colors.red,
             fontWeight: FontWeight.w600,
             fontSize: 14,
           ),
         ),
-        subtitle: const Text(
-          'Hesabdan çıxış edin',
+        subtitle: Text(
+          tr('Hesabdan çıxış edin'),
           style: TextStyle(color: Color(0xFF8899BB), fontSize: 12),
         ),
       ),

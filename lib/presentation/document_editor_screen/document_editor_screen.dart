@@ -24,7 +24,7 @@ import '../../core/text_case.dart';
 import '../../core/rich_markup.dart';
 import '../../services/mobile_export_service.dart';
 import '../../services/local_docs_cache.dart';
-import '../../services/template_service.dart';
+import 'doc_title.dart';
 import '../../services/book_structure.dart';
 import 'widgets/document_canvas.dart';
 import 'package:share_plus/share_plus.dart';
@@ -33,6 +33,7 @@ import '../../core/page_size.dart';
 import '../../core/book_chrome.dart';
 import '../../core/page_layout.dart';
 import '../../widgets/layout_page_view.dart';
+import '../../l10n/ui_strings.dart';
 
 
 
@@ -520,18 +521,18 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
                   .length;
             }
             return AlertDialog(
-              title: const Text('Find & Replace'),
+              title: Text(tr('Find & Replace')),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   TextField(
                     controller: findCtrl,
-                    decoration: const InputDecoration(labelText: 'Find'),
+                    decoration: InputDecoration(labelText: tr('Find')),
                     onChanged: (_) => setLocal(() {}),
                   ),
                   TextField(
                     controller: replaceCtrl,
-                    decoration: const InputDecoration(labelText: 'Replace with'),
+                    decoration: InputDecoration(labelText: tr('Replace with')),
                   ),
                   const SizedBox(height: 8),
                   Align(
@@ -548,7 +549,7 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(ctx),
-                  child: const Text('Close'),
+                  child: Text(tr('Close')),
                 ),
                 TextButton(
                   onPressed: () {
@@ -561,7 +562,7 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
                     if (i < 0) i = lower.indexOf(q);
                     if (i < 0) {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Tapılmadı')),
+                        SnackBar(content: Text(tr('Tapılmadı'))),
                       );
                       return;
                     }
@@ -573,7 +574,7 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
                     _bodyFocusNode.requestFocus();
                     setLocal(() {});
                   },
-                  child: const Text('Find next'),
+                  child: Text(tr('Find next')),
                 ),
                 TextButton(
                   onPressed: () {
@@ -600,7 +601,7 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
                     });
                     setLocal(() {});
                   },
-                  child: const Text('Replace'),
+                  child: Text(tr('Replace')),
                 ),
                 FilledButton(
                   onPressed: () {
@@ -615,10 +616,10 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
                     });
                     Navigator.pop(ctx);
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Hamısı əvəz olundu')),
+                      SnackBar(content: Text(tr('Hamısı əvəz olundu'))),
                     );
                   },
-                  child: const Text('Replace all'),
+                  child: Text(tr('Replace all')),
                 ),
               ],
             );
@@ -748,7 +749,7 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
             Padding(
               padding: const EdgeInsets.all(16),
               child: Text(
-                'Styles',
+                tr('Styles'),
                 style: GoogleFonts.dmSans(
                   fontSize: 18,
                   fontWeight: FontWeight.w700,
@@ -793,7 +794,7 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
     final sel = _bodyCtrl.selection;
     if (!sel.isValid || sel.isCollapsed) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Əvvəl mətni seçin')),
+        SnackBar(content: Text(tr('Əvvəl mətni seçin'))),
       );
       return;
     }
@@ -858,7 +859,7 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  'Fəsillər (${chapters.length})',
+                                  trf('Fəsillər ({n})', {'n': chapters.length}),
                                   style: GoogleFonts.dmSans(
                                     fontWeight: FontWeight.w700,
                                     fontSize: 18,
@@ -866,7 +867,7 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
                                   ),
                                 ),
                                 Text(
-                                  '$totalWords söz · ~$totalPages səh · ~${(totalWords / 200).ceil()} dəq',
+                                  trf('{w} söz · ~{p} səh · ~{m} dəq', {'w': totalWords, 'p': totalPages, 'm': (totalWords / 200).ceil()}),
                                   style: GoogleFonts.dmSans(
                                     fontSize: 12,
                                     color: Colors.white54,
@@ -878,13 +879,13 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
                           IconButton(
                             icon: const Icon(Icons.format_list_numbered,
                                 color: Colors.white),
-                            tooltip: 'Nömrələ',
+                            tooltip: tr('Nömrələ'),
                             onPressed: () =>
                                 apply(BookStructure.renumber(_bodyCtrl.text)),
                           ),
                           IconButton(
                             icon: const Icon(Icons.add, color: Colors.white),
-                            tooltip: 'Fəsil əlavə et',
+                            tooltip: tr('Fəsil əlavə et'),
                             onPressed: () {
                               Navigator.pop(ctx);
                               _insertChapterHeading();
@@ -904,7 +905,7 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
                               child: Padding(
                                 padding: const EdgeInsets.all(24),
                                 child: Text(
-                                  'Hələ fəsil yoxdur.\n+ və ya Insert → Fəsil.',
+                                  tr('Hələ fəsil yoxdur.\n+ və ya Insert → Fəsil.'),
                                   textAlign: TextAlign.center,
                                   style:
                                       GoogleFonts.dmSans(color: Colors.white54),
@@ -942,7 +943,7 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
                                     ),
                                   ),
                                   subtitle: Text(
-                                    'H$level · $words söz · ~${(words / 250).toStringAsFixed(1)} s',
+                                    trf('H{l} · {w} söz · ~{p} s', {'l': level, 'w': words, 'p': (words / 250).toStringAsFixed(1)}),
                                     style: GoogleFonts.dmSans(
                                       fontSize: 11,
                                       color: Colors.white54,
@@ -966,14 +967,14 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
                                         showDialog(
                                           context: context,
                                           builder: (dctx) => AlertDialog(
-                                            title: const Text('Adı dəyiş'),
+                                            title: Text(tr('Adı dəyiş')),
                                             content:
                                                 TextField(controller: ctrl),
                                             actions: [
                                               TextButton(
                                                 onPressed: () =>
                                                     Navigator.pop(dctx),
-                                                child: const Text('Ləğv'),
+                                                child: Text(tr('Ləğv')),
                                               ),
                                               FilledButton(
                                                 onPressed: () {
@@ -1009,42 +1010,42 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
                                             _bodyCtrl.text, i, -1));
                                       }
                                     },
-                                    itemBuilder: (_) => const [
+                                    itemBuilder: (_) => [
                                       PopupMenuItem(
                                           value: 'rename',
-                                          child: Text('Adı dəyiş',
+                                          child: Text(tr('Adı dəyiş'),
                                               style: TextStyle(
                                                   color: Colors.white))),
                                       PopupMenuItem(
                                           value: 'duplicate',
                                           child: Text(
-                                              'Fəsili köçür (mətn daxil)',
+                                              tr('Fəsili köçür (mətn daxil)'),
                                               style: TextStyle(
                                                   color: Colors.white))),
                                       PopupMenuItem(
                                           value: 'promote',
-                                          child: Text('Səviyyə qaldır (H−)',
+                                          child: Text(tr('Səviyyə qaldır (H−)'),
                                               style: TextStyle(
                                                   color: Colors.white))),
                                       PopupMenuItem(
                                           value: 'sub',
-                                          child: Text('Səviyyə endir (H+)',
+                                          child: Text(tr('Səviyyə endir (H+)'),
                                               style: TextStyle(
                                                   color: Colors.white))),
                                       PopupMenuItem(
                                           value: 'up',
-                                          child: Text('Yuxarı (bütün fəsil)',
+                                          child: Text(tr('Yuxarı (bütün fəsil)'),
                                               style: TextStyle(
                                                   color: Colors.white))),
                                       PopupMenuItem(
                                           value: 'down',
-                                          child: Text('Aşağı (bütün fəsil)',
+                                          child: Text(tr('Aşağı (bütün fəsil)'),
                                               style: TextStyle(
                                                   color: Colors.white))),
                                       PopupMenuItem(
                                           value: 'delete',
                                           child: Text(
-                                              'Fəsili sil (mətn daxil)',
+                                              tr('Fəsili sil (mətn daxil)'),
                                               style: TextStyle(
                                                   color: Colors.redAccent))),
                                     ],
@@ -1064,7 +1065,7 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
                                 _insertTableOfContents();
                               },
                               icon: const Icon(Icons.list_alt),
-                              label: const Text('Mündəricat'),
+                              label: Text(tr('Mündəricat')),
                             ),
                           ),
                           const SizedBox(width: 8),
@@ -1075,7 +1076,7 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
                                 _insertChapterHeading();
                               },
                               icon: const Icon(Icons.add),
-                              label: const Text('Fəsil'),
+                              label: Text(tr('Fəsil')),
                               style: FilledButton.styleFrom(
                                 backgroundColor: const Color(0xFF2B5CE6),
                               ),
@@ -1329,7 +1330,7 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
     });
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Ölçü $sz seçilənə tətbiq olundu', style: GoogleFonts.dmSans()),
+        content: Text(trf('Ölçü {sz} seçilənə tətbiq olundu', {'sz': sz}), style: GoogleFonts.dmSans()),
         behavior: SnackBarBehavior.floating,
         duration: const Duration(seconds: 1),
       ),
@@ -1344,7 +1345,7 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
     final sel = _bodyCtrl.selection;
     if (!sel.isValid || sel.isCollapsed) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Formatı silmək üçün mətni seçin')),
+        SnackBar(content: Text(tr('Formatı silmək üçün mətni seçin'))),
       );
       return;
     }
@@ -1425,7 +1426,7 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
       await showDialog(
         context: context,
         builder: (ctx) => AlertDialog(
-          title: const Text('Page limit'),
+          title: Text(tr('Page limit')),
           content: Text(msg),
           actions: [
             TextButton(
@@ -1437,7 +1438,7 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
                 Navigator.pop(ctx);
                 context.push(AppRoutes.subscriptionPlanScreen);
               },
-              child: const Text('View plans'),
+              child: Text(tr('View plans')),
             ),
           ],
         ),
@@ -1525,8 +1526,8 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
       _insertAtCursor('\n${_imgMarkup(entry)}\n');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Image inserted'),
+          SnackBar(
+            content: Text(tr('Image inserted')),
             duration: Duration(seconds: 1),
           ),
         );
@@ -1535,7 +1536,7 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
       debugPrint("Error: $e\n$st");
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Şəkil seçilmədi. Yenidən cəhd edin.')),
+          SnackBar(content: Text(tr('Şəkil seçilmədi. Yenidən cəhd edin.'))),
         );
       }
     }
@@ -1553,8 +1554,8 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
     _insertAtCursor(md);
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Link inserted'),
+        SnackBar(
+          content: Text(tr('Link inserted')),
           duration: Duration(seconds: 1),
         ),
       );
@@ -1590,8 +1591,8 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
       });
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Table updated'),
+          SnackBar(
+            content: Text(tr('Table updated')),
             duration: Duration(seconds: 1),
           ),
         );
@@ -1609,7 +1610,7 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
       );
       if (md == null || md.isEmpty) return;
       _insertAtCursor(md.startsWith('\n') ? md : '\n$md\n');
-      _toast('Cədvəl daxil edildi — xanalara birbaşa yazın');
+      _toast(tr('Cədvəl daxil edildi — xanalara birbaşa yazın'));
       return;
     }
     _insertVisualTable(rows: size.rows, cols: size.cols);
@@ -1712,7 +1713,7 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
       _isSaved = false;
     });
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('TOC removed'), duration: Duration(seconds: 1)),
+      SnackBar(content: Text(tr('TOC removed')), duration: Duration(seconds: 1)),
     );
   }
 
@@ -1731,7 +1732,7 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
           children: [
             ListTile(
               title: Text(
-                'Table of Contents',
+                tr('Table of Contents'),
                 style: GoogleFonts.dmSans(
                   fontWeight: FontWeight.w700,
                   color: Colors.white,
@@ -1755,7 +1756,7 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
             ),
             ListTile(
               leading: const Icon(Icons.filter_1, color: Colors.white70),
-              title: const Text('TOC — chapters only (H1)',
+              title: Text(tr('TOC — chapters only (H1)'),
                   style: TextStyle(color: Colors.white)),
               onTap: () {
                 Navigator.pop(ctx);
@@ -1764,7 +1765,7 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
             ),
             ListTile(
               leading: const Icon(Icons.filter_2, color: Colors.white70),
-              title: const Text('TOC — H1 + H2',
+              title: Text(tr('TOC — H1 + H2'),
                   style: TextStyle(color: Colors.white)),
               onTap: () {
                 Navigator.pop(ctx);
@@ -1774,7 +1775,7 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
             if (has)
               ListTile(
                 leading: const Icon(Icons.delete_outline, color: Colors.redAccent),
-                title: const Text('Delete TOC',
+                title: Text(tr('Delete TOC'),
                     style: TextStyle(color: Colors.redAccent)),
                 onTap: () {
                   Navigator.pop(ctx);
@@ -1824,7 +1825,7 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
                     ),
                     const SizedBox(height: 16),
                     Text(
-                      'Header & Footer',
+                      tr('Header & Footer'),
                       style: GoogleFonts.dmSans(
                         fontSize: 18,
                         fontWeight: FontWeight.w700,
@@ -1833,7 +1834,7 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'Quick fill',
+                      tr('Quick fill'),
                       style: GoogleFonts.dmSans(color: Colors.white54, fontSize: 12),
                     ),
                     const SizedBox(height: 8),
@@ -1842,7 +1843,7 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
                       runSpacing: 8,
                       children: [
                         ActionChip(
-                          label: const Text('Book title'),
+                          label: Text(tr('Book title')),
                           onPressed: () {
                             final title = _titleCtrl.text.trim().isNotEmpty
                                 ? _titleCtrl.text.trim()
@@ -1852,7 +1853,7 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
                           },
                         ),
                         ActionChip(
-                          label: const Text('Chapter'),
+                          label: Text(tr('Chapter')),
                           onPressed: () {
                             // nearest H1 above cursor
                             final pos = _bodyCtrl.selection.isValid
@@ -1872,14 +1873,14 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
                           },
                         ),
                         ActionChip(
-                          label: const Text('Author'),
+                          label: Text(tr('Author')),
                           onPressed: () {
                             headerCtrl.text = 'Author Name';
                             setLocal(() {});
                           },
                         ),
                         ActionChip(
-                          label: const Text('Date'),
+                          label: Text(tr('Date')),
                           onPressed: () {
                             final d = DateTime.now();
                             footerCtrl.text =
@@ -1888,7 +1889,7 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
                           },
                         ),
                         ActionChip(
-                          label: const Text('Title · Chapter'),
+                          label: Text(tr('Title · Chapter')),
                           onPressed: () {
                             final title = _titleCtrl.text.trim().isNotEmpty
                                 ? _titleCtrl.text.trim()
@@ -1915,10 +1916,10 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
                     TextField(
                       controller: headerCtrl,
                       style: const TextStyle(color: Colors.white),
-                      decoration: const InputDecoration(
-                        labelText: 'Header (top of page)',
+                      decoration: InputDecoration(
+                        labelText: tr('Header (top of page)'),
                         labelStyle: TextStyle(color: Colors.white70),
-                        hintText: 'Book title / chapter / author',
+                        hintText: tr('Book title / chapter / author'),
                         hintStyle: TextStyle(color: Colors.white30),
                       ),
                     ),
@@ -1926,16 +1927,16 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
                     TextField(
                       controller: footerCtrl,
                       style: const TextStyle(color: Colors.white),
-                      decoration: const InputDecoration(
-                        labelText: 'Footer (bottom of page)',
+                      decoration: InputDecoration(
+                        labelText: tr('Footer (bottom of page)'),
                         labelStyle: TextStyle(color: Colors.white70),
-                        hintText: 'Author / date / custom',
+                        hintText: tr('Author / date / custom'),
                         hintStyle: TextStyle(color: Colors.white30),
                       ),
                     ),
                     SwitchListTile(
                       contentPadding: EdgeInsets.zero,
-                      title: const Text('Page numbers',
+                      title: Text(tr('Page numbers'),
                           style: TextStyle(color: Colors.white)),
                       value: _showPageNumbers,
                       onChanged: (v) => setLocal(() {
@@ -1958,8 +1959,8 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
                           });
                           Navigator.pop(ctx);
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Üst və alt qeyd saxlanıldı'),
+                            SnackBar(
+                              content: Text(tr('Üst və alt qeyd saxlanıldı')),
                               duration: Duration(seconds: 1),
                             ),
                           );
@@ -1969,7 +1970,7 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
                           padding: const EdgeInsets.symmetric(vertical: 14),
                         ),
                         child: Text(
-                          'Apply',
+                          tr('Apply'),
                           style: GoogleFonts.dmSans(fontWeight: FontWeight.w600),
                         ),
                       ),
@@ -1994,7 +1995,7 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const ListTile(title: Text('Page margins')),
+              ListTile(title: Text(tr('Page margins'))),
               ...PageMargin.values.map((m) {
                 return ListTile(
                   title: Text(m.label),
@@ -2090,7 +2091,7 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
       caption: caption,
     );
     _insertAtCursor('\n$markup\n');
-    _toast('Cədvəl daxil edildi — xanalara birbaşa yazın');
+    _toast(tr('Cədvəl daxil edildi — xanalara birbaşa yazın'));
   }
 
   void _insertPresetTable({
@@ -2187,23 +2188,23 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
     final text = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Haşiyə'),
+        title: Text(tr('Haşiyə')),
         content: TextField(
           controller: ctrl,
           maxLines: 4,
           autofocus: true,
-          decoration: const InputDecoration(
-            hintText: 'Kənar qeyd yazın…',
+          decoration: InputDecoration(
+            hintText: tr('Kənar qeyd yazın…'),
           ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Ləğv'),
+            child: Text(tr('Ləğv')),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
-            child: const Text('Əlavə et'),
+            child: Text(tr('Əlavə et')),
           ),
         ],
       ),
@@ -2333,7 +2334,7 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
 
   void _renumberChapters() {
     _applyBookText(BookStructure.renumber(_bodyCtrl.text));
-    _toast('Fəsillər nömrələndi');
+    _toast(tr('Fəsillər nömrələndi'));
   }
 
   void _splitChapterAtCursor() {
@@ -2345,7 +2346,7 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
       BookStructure.splitAt(_bodyCtrl.text, cursor, label: _chapterWord),
       cursor: cursor + 8,
     );
-    _toast('Fəsil kursor yerindən bölündü');
+    _toast(tr('Fəsil kursor yerindən bölündü'));
   }
 
   static final _fnDefLineRe = RegExp(r'^\[\^(\d+)\]:[ \t]*(.*)$', multiLine: true);
@@ -2439,21 +2440,21 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
     final note = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text('Qeyd [^$n]'),
+        title: Text(trf('Qeyd [^{n}]', {'n': n})),
         content: TextField(
           controller: ctrl,
           maxLines: 4,
           autofocus: true,
-          decoration: const InputDecoration(hintText: 'İzah / mənbə'),
+          decoration: InputDecoration(hintText: tr('İzah / mənbə')),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Ləğv'),
+            child: Text(tr('Ləğv')),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
-            child: const Text('Daxil et'),
+            child: Text(tr('Daxil et')),
           ),
         ],
       ),
@@ -2470,7 +2471,7 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
   void _showBookNotes() {
     final ctrl = TextEditingController(
       text: _docSettings.bookNotes.isEmpty
-          ? 'Personajlar:\n- \n\nMəkanlar:\n- \n\nSüjet:\n- \n'
+          ? tr('Personajlar:\n- \n\nMəkanlar:\n- \n\nSüjet:\n- \n')
           : _docSettings.bookNotes,
     );
     showDarkSheet(
@@ -2493,7 +2494,7 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
                 Row(
                   children: [
                     Text(
-                      'Kitab dəftəri',
+                      tr('Kitab dəftəri'),
                       style: GoogleFonts.dmSans(
                         color: Colors.white,
                         fontWeight: FontWeight.w700,
@@ -2509,13 +2510,13 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
                           _hasUnsavedChanges = true;
                         });
                       },
-                      child: const Text('Saxla'),
+                      child: Text(tr('Saxla')),
                     ),
                   ],
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Personaj, məkan, süjet — oxucuya görünmür.',
+                  tr('Personaj, məkan, süjet — oxucuya görünmür.'),
                   style: GoogleFonts.dmSans(color: Colors.white54, fontSize: 12),
                 ),
                 const SizedBox(height: 12),
@@ -2555,10 +2556,10 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
       ..writeln('© $year $author. ${_l('Bütün hüquqlar qorunur.', 'All rights reserved.', 'Все права защищены.', 'جميع الحقوق محفوظة.')}')
       ..writeln()
       ..writeln(
-        'Bu əsərin heç bir hissəsi müəllifin yazılı icazəsi olmadan çoxaldıla, yayıla və ya saxlana bilməz.',
+        tr('Bu əsərin heç bir hissəsi müəllifin yazılı icazəsi olmadan çoxaldıla, yayıla və ya saxlana bilməz.'),
       )
       ..writeln();
-    if (pub.isNotEmpty) buf.writeln('Nəşriyyat: $pub\n');
+    if (pub.isNotEmpty) buf.writeln('${trf('Nəşriyyat: {pub}', {'pub': pub})}\n');
     if (isbn.isNotEmpty) buf.writeln('ISBN: $isbn\n');
     buf.writeln('--- Page Break ---\n');
     _insertAtCursor(buf.toString());
@@ -2590,7 +2591,7 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
   void _insertGlossary() {
     _insertAtCursor(
       '\n# ${_l('Lüğət', 'Glossary', 'Глоссарий', 'مسرد')}\n\n'
-      '${TableBlock.markupFrom(rows: 8, cols: 2, headers: ['Term', 'İzah'], caption: 'Lüğət')}\n'
+      '${TableBlock.markupFrom(rows: 8, cols: 2, headers: [tr('Term'), tr('İzah')], caption: tr('Lüğət'))}\n'
       '--- Page Break ---\n\n',
     );
   }
@@ -2598,75 +2599,75 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
   void _insertBibliography() {
     _insertAtCursor(
       '\n# ${_l('Ədəbiyyat', 'Bibliography', 'Библиография', 'المراجع')}\n\n'
-      '${TableBlock.markupFrom(rows: 7, cols: 4, headers: ['Müəllif', 'Əsər', 'İl', 'Qeyd'], caption: 'Mənbələr')}\n'
+      '${TableBlock.markupFrom(rows: 7, cols: 4, headers: [tr('Müəllif'), tr('Əsər'), tr('İl'), tr('Qeyd')], caption: tr('Mənbələr'))}\n'
       '--- Page Break ---\n\n',
     );
   }
 
   void _insertCastTable() {
     _insertPresetTable(
-      headers: ['Ad', 'Rol', 'İstək', 'Qüsur', 'Qeyd'],
-      caption: 'Personajlar',
+      headers: [tr('Ad'), tr('Rol'), tr('İstək'), tr('Qüsur'), tr('Qeyd')],
+      caption: tr('Personajlar'),
     );
   }
 
   void _insertPlacesTable() {
     _insertPresetTable(
-      headers: ['Məkan', 'Tip', 'Əhval', 'Kimlər', 'Qeyd'],
-      caption: 'Məkanlar',
+      headers: [tr('Məkan'), tr('Tip'), tr('Əhval'), tr('Kimlər'), tr('Qeyd')],
+      caption: tr('Məkanlar'),
     );
   }
 
   void _insertTimelineTable() {
     _insertPresetTable(
-      headers: ['Tarix / sıra', 'Hadisə', 'Kim', 'Nəticə'],
-      caption: 'Xronologiya',
+      headers: [tr('Tarix / sıra'), tr('Hadisə'), tr('Kim'), tr('Nəticə')],
+      caption: tr('Xronologiya'),
     );
   }
 
   void _insertSceneTable() {
     _insertPresetTable(
-      headers: ['Fəsil', 'Səhnə', 'POV', 'Məqsəd', 'Konflikt', 'Nəticə'],
-      caption: 'Səhnə siyahısı',
+      headers: [tr('Fəsil'), tr('Səhnə'), tr('POV'), tr('Məqsəd'), tr('Konflikt'), tr('Nəticə')],
+      caption: tr('Səhnə siyahısı'),
       dataRows: 8,
     );
   }
 
   void _insertOutlineTable() {
     _insertPresetTable(
-      headers: ['Fəsil', 'Ad', 'Akt', 'Söz', 'Status'],
-      caption: 'Fəsil planı',
+      headers: [tr('Fəsil'), tr('Ad'), tr('Akt'), tr('Söz'), tr('Status')],
+      caption: tr('Fəsil planı'),
       dataRows: 10,
     );
   }
 
   void _insertResearchTable() {
     _insertPresetTable(
-      headers: ['Mövzu', 'Mənbə', 'Səh.', 'Fakt', 'Qeyd'],
-      caption: 'Tədqiqat',
+      headers: [tr('Mövzu'), tr('Mənbə'), tr('Səh.'), tr('Fakt'), tr('Qeyd')],
+      caption: tr('Tədqiqat'),
     );
   }
 
   void _insertSceneCard() {
     _insertAtCursor(
-      '\n## Səhnə\n\n'
+      '\n## ${tr('Səhnə')}\n\n'
       '**POV:** \n'
-      '**Yer / vaxt:** \n'
-      '**Məqsəd:** \n'
-      '**Konflikt:** \n'
-      '**Dönüş:** \n'
-      '**Nəticə:** \n\n',
+      '**${tr('Yer / vaxt')}:** \n'
+      '**${tr('Məqsəd')}:** \n'
+      '**${tr('Konflikt')}:** \n'
+      '**${tr('Dönüş')}:** \n'
+      '**${tr('Nəticə')}:** \n\n',
     );
   }
 
   void _insertOutlineActs() {
     _insertAtCursor(
       '\n# Outline\n\n'
-      '## Act I — Başlanğıc\n'
+      '## Act I — ${tr('Başlanğıc')}\n'
       '- \n\n'
-      '## Act II — Yüksəliş\n'
+      '## Act II — ${tr('Yüksəliş')}\n'
       '- \n\n'
-      '## Act III — Qovuşma\n'
+      '## Act III — ${tr('Qovuşma')}\n'
       '- \n\n',
     );
   }
@@ -2679,7 +2680,7 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
       debugPrint("Error: $e\n$st");
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Paylaşmaq alınmadı. Yenidən cəhd edin.')),
+        SnackBar(content: Text(tr('Paylaşmaq alınmadı. Yenidən cəhd edin.'))),
       );
     }
   }
@@ -2724,7 +2725,7 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
                   child: Row(
                     children: [
                       Text(
-                        'Ad indeksi',
+                        tr('Ad indeksi'),
                         style: GoogleFonts.dmSans(
                           color: Colors.white,
                           fontWeight: FontWeight.w700,
@@ -2742,16 +2743,16 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   child: Text(
-                    'Personaj cədvəlindən və mətndə təkrarlanan adlardan.',
+                    tr('Personaj cədvəlindən və mətndə təkrarlanan adlardan.'),
                     style: GoogleFonts.dmSans(color: Colors.white54, fontSize: 12),
                   ),
                 ),
                 const Divider(color: Colors.white12),
                 Expanded(
                   child: keys.isEmpty
-                      ? const Center(
+                      ? Center(
                           child: Text(
-                            'Ad tapılmadı. Əvvəl personaj cədvəli əlavə edin.',
+                            tr('Ad tapılmadı. Əvvəl personaj cədvəli əlavə edin.'),
                             style: TextStyle(color: Colors.white54),
                           ),
                         )
@@ -2820,7 +2821,7 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Əlyazma',
+                  tr('Əlyazma'),
                   style: GoogleFonts.dmSans(
                     color: Colors.white,
                     fontWeight: FontWeight.w700,
@@ -2828,17 +2829,17 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
                   ),
                 ),
                 const SizedBox(height: 14),
-                _statRow('Söz', '$words'),
-                _statRow('Bu seans', '+$session'),
-                _statRow('Hədəf', '${_fmtNum(goal)}  ·  ${pct.toStringAsFixed(1)}%'),
-                _statRow('Qalıq', remain == 0 ? 'Hədəf dolub' : '${_fmtNum(remain)} söz'),
-                _statRow('Gündəlik hədəf', '$session / $daily'),
-                _statRow('Simvol', '$chars'),
-                _statRow('Paraqlıq', '$paras'),
-                _statRow('Fəsil / hissə (H1)', '$chapters'),
-                _statRow('Səhnə bölgüsü', '$scenes'),
-                _statRow('Təxmini səhifə (~250 söz)', '$pages'),
-                _statRow('Oxuma (~200 wpm)', '$minRead dəq'),
+                _statRow(tr('Söz'), '$words'),
+                _statRow(tr('Bu seans'), '+$session'),
+                _statRow(tr('Hədəf'), '${_fmtNum(goal)}  ·  ${pct.toStringAsFixed(1)}%'),
+                _statRow(tr('Qalıq'), remain == 0 ? tr('Hədəf dolub') : trf('{n} söz', {'n': _fmtNum(remain)})),
+                _statRow(tr('Gündəlik hədəf'), '$session / $daily'),
+                _statRow(tr('Simvol'), '$chars'),
+                _statRow(tr('Paraqlıq'), '$paras'),
+                _statRow(tr('Fəsil / hissə (H1)'), '$chapters'),
+                _statRow(tr('Səhnə bölgüsü'), '$scenes'),
+                _statRow(tr('Təxmini səhifə (~250 söz)'), '$pages'),
+                _statRow(tr('Oxuma (~200 wpm)'), trf('{n} dəq', {'n': minRead})),
                 const SizedBox(height: 10),
                 ClipRRect(
                   borderRadius: BorderRadius.circular(6),
@@ -2852,8 +2853,8 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
                 const SizedBox(height: 10),
                 Text(
                   novel
-                      ? 'Roman həcmi: 50 000+ söz — keçdiniz.'
-                      : 'Roman həcmi adətən 50 000 sözdür. Qalıq: ${50000 - words}.',
+                      ? tr('Roman həcmi: 50 000+ söz — keçdiniz.')
+                      : trf('Roman həcmi adətən 50 000 sözdür. Qalıq: {n}.', {'n': 50000 - words}),
                   style: GoogleFonts.dmSans(
                     color: const Color(0xFFC9A84C),
                     fontSize: 13,
@@ -2895,7 +2896,7 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
 
   /// Visible title: hidden title field, otherwise first non-empty line.
   String _currentTitle() {
-    final typed = _titleCtrl.text.trim();
+    final typed = DocTitle.clean(_titleCtrl.text);
     if (typed.isNotEmpty) return typed;
     return _extractTitle();
   }
@@ -2906,22 +2907,8 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
 
   /// Extract title from first line of body text
   String _extractTitle() {
-    final text = _bodyCtrl.text;
-    final untitled = AppLocalizations.of(context).untitledDocument;
-    final cover = CoverData.parse(text);
-    if (cover != null && cover.title.isNotEmpty && cover.title != CoverData.brandTitle) return cover.title;
-    // First real line of text, without markup or block tokens.
-    for (final line in text.split('\n')) {
-      final t = line.trim();
-      if (t.isEmpty || t.startsWith('[COVER') || t.startsWith('[img') || t.startsWith('[TABLE') ||
-          t.startsWith('[/TABLE') || t.startsWith('|') || t.contains('Page Break') || t.startsWith('[note') ||
-          t.startsWith('[HAŞİYƏ') || RegExp(r'^[-*\s]+$').hasMatch(t)) {
-        continue;
-      }
-      final c = CoverData.cleanText(t);
-      if (c.isNotEmpty) return c.length > 80 ? '${c.substring(0, 80).trimRight()}…' : c;
-    }
-    return untitled;
+    final t = DocTitle.fromBody(_bodyCtrl.text);
+    return t.isNotEmpty ? t : AppLocalizations.of(context).untitledDocument;
   }
 
   Future<void> _saveDocument() async {
@@ -2954,7 +2941,7 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              'Saxlanıldı',
+              tr('Saxlanıldı'),
               style: GoogleFonts.dmSans(),
             ),
             behavior: SnackBarBehavior.floating,
@@ -2967,7 +2954,7 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
       if (mounted) {
         setState(() => _isSaving = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Sənəd saxlanılmadı. Yenidən cəhd edin.')),
+          SnackBar(content: Text(tr('Sənəd saxlanılmadı. Yenidən cəhd edin.'))),
         );
       }
     }
@@ -3236,10 +3223,18 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
     }
   }
 
+  @visibleForTesting
+  Future<ExportFormat?> showFormatPickerForTest() => _showFormatPicker();
+
   Future<ExportFormat?> _showFormatPicker() async {
     final l10n = AppLocalizations.of(context);
     return showModalBottomSheet<ExportFormat>(
       context: context,
+      // Scrollable and height-capped: on 1080×2340 phones and 7" tablets the
+      // fixed sheet used to overflow (switch + 2 cards + 2 tiles + cancel).
+      isScrollControlled: true,
+      useSafeArea: true,
+      constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.9),
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -3247,8 +3242,9 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
         final theme = Theme.of(ctx);
         return StatefulBuilder(
           builder: (ctx, setLocal) {
-        return Padding(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+        return SingleChildScrollView(
+          key: const Key('export-format-sheet'),
+          padding: EdgeInsets.fromLTRB(20, 16, 20, 24 + MediaQuery.paddingOf(ctx).bottom),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -3265,9 +3261,9 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
               const SizedBox(height: 16),
               SwitchListTile(
                 contentPadding: EdgeInsets.zero,
-                title: const Text('Yalnız əlyazma'),
-                subtitle: const Text(
-                  'Personaj / məkan / xronologiya cədvəlləri çıxarılır',
+                title: Text(tr('Yalnız əlyazma')),
+                subtitle: Text(
+                  tr('Personaj / məkan / xronologiya cədvəlləri çıxarılır'),
                 ),
                 value: _manuscriptExport,
                 onChanged: (v) {
@@ -3327,13 +3323,13 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
               ListTile(
                 leading: const Icon(Icons.text_snippet_outlined),
                 title: const Text('TXT'),
-                subtitle: const Text('Plain text file'),
+                subtitle: Text(tr('Plain text file')),
                 onTap: () => Navigator.pop(ctx, ExportFormat.txt),
               ),
               ListTile(
                 leading: const Icon(Icons.menu_book_outlined),
                 title: const Text('EPUB'),
-                subtitle: const Text('E-book format'),
+                subtitle: Text(tr('E-book format')),
                 onTap: () => Navigator.pop(ctx, ExportFormat.epub),
               ),
               TextButton(
@@ -3674,7 +3670,7 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Səhifə nömrəsi',
+                      tr('Səhifə nömrəsi'),
                       style: GoogleFonts.dmSans(
                         fontSize: 16,
                         fontWeight: FontWeight.w700,
@@ -3682,7 +3678,7 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
                     ),
                     SwitchListTile(
                       contentPadding: EdgeInsets.zero,
-                      title: const Text('Göstər'),
+                      title: Text(tr('Göstər')),
                       value: _showPageNumbers,
                       onChanged: (v) {
                         setState(() {
@@ -3697,12 +3693,12 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
                       spacing: 8,
                       children: [
                         for (final e in [
-                          ('bottom-center', 'Alt orta'),
-                          ('bottom-right', 'Alt sağ'),
-                          ('bottom-left', 'Alt sol'),
-                          ('top-center', 'Üst orta'),
-                          ('top-right', 'Üst sağ'),
-                          ('top-left', 'Üst sol'),
+                          ('bottom-center', tr('Alt orta')),
+                          ('bottom-right', tr('Alt sağ')),
+                          ('bottom-left', tr('Alt sol')),
+                          ('top-center', tr('Üst orta')),
+                          ('top-right', tr('Üst sağ')),
+                          ('top-left', tr('Üst sol')),
                         ])
                           ChoiceChip(
                             label: Text(e.$2),
@@ -3722,7 +3718,7 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
                     const SizedBox(height: 12),
                     Row(
                       children: [
-                        const Expanded(child: Text('Hansı səhifədən')),
+                        Expanded(child: Text(tr('Hansı səhifədən'))),
                         IconButton(
                           onPressed: _docSettings.pageNumberStartPage > 1
                               ? () {
@@ -3753,7 +3749,7 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
                     ),
                     Row(
                       children: [
-                        const Expanded(child: Text('İlk rəqəm')),
+                        Expanded(child: Text(tr('İlk rəqəm'))),
                         IconButton(
                           onPressed: _docSettings.pageNumberStartAt > 1
                               ? () {
@@ -3783,7 +3779,7 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
                       ],
                     ),
                     Text(
-                      'Səhifə ${_docSettings.pageNumberStartPage}-də ${_docSettings.pageNumberStartAt}, sonra ${_docSettings.pageNumberStartAt + 1}, ${_docSettings.pageNumberStartAt + 2}…',
+                      trf('Səhifə {p}-də {a}, sonra {b}, {c}…', {'p': _docSettings.pageNumberStartPage, 'a': _docSettings.pageNumberStartAt, 'b': _docSettings.pageNumberStartAt + 1, 'c': _docSettings.pageNumberStartAt + 2}),
                       style: TextStyle(
                         color: Theme.of(ctx).colorScheme.onSurfaceVariant,
                         fontSize: 12,
@@ -3807,7 +3803,7 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
           children: [
             ListTile(
               title: Text(
-                'Line spacing',
+                tr('Line spacing'),
                 style: GoogleFonts.dmSans(fontWeight: FontWeight.w700),
               ),
             ),
@@ -3850,7 +3846,7 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
             en: 'Select text first',
             ru: 'Сначала выделите текст',
             ar: 'حدد النص أولاً',
-          ).replaceAll('Əvvəl mətni seçin', 'Əvvəl mətnə toxunun və ya mətni seçin')),
+          ).replaceAll(tr('Əvvəl mətni seçin'), tr('Əvvəl mətnə toxunun və ya mətni seçin'))),
           duration: const Duration(seconds: 2),
         ),
       );
@@ -3989,8 +3985,7 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
 
   Widget _buildAppBar(ThemeData theme) {
     final l10n = AppLocalizations.of(context);
-    final firstLine = _bodyCtrl.text.split('\n').first.trim();
-    final title = firstLine.isEmpty ? l10n.untitledDocument : firstLine;
+    final title = DocTitle.display(typed: _titleCtrl.text, body: _bodyCtrl.text, untitled: l10n.untitledDocument);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
       decoration: BoxDecoration(
@@ -4117,7 +4112,7 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Text(
-                'Üz qabığı',
+                tr('Üz qabığı'),
                 style: GoogleFonts.dmSans(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
@@ -4653,10 +4648,10 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
               onTap: _showManuscriptStats,
               child: Text(
                 _focusMode
-                    ? '$words söz  ·  +$session seans'
+                    ? trf('{w} söz  ·  +{s} seans', {'w': words, 's': session})
                     : '${_fmtNum(words)} / ${_fmtNum(goal)} ${l10n.wordCount}'
-                        '  ·  +$session seans'
-                        '  ·  $session/$daily gün',
+                        '${trf('  ·  +{s} seans', {'s': session})}'
+                        '${trf('  ·  {s}/{d} gün', {'s': session, 'd': daily})}',
                 style: GoogleFonts.dmSans(
                   fontSize: 11,
                   color: theme.colorScheme.onSurfaceVariant,
@@ -4940,7 +4935,7 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
                           controller: scrollCtrl,
                           children: [
                             SwitchListTile(
-                              title: const Text('Bold'),
+                              title: Text(tr('Bold')),
                               value: bold,
                               onChanged: (v) {
                                 setS(() => bold = v);
@@ -4948,7 +4943,7 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
                               },
                             ),
                             SwitchListTile(
-                              title: const Text('Italic'),
+                              title: Text(tr('Italic')),
                               value: italic,
                               onChanged: (v) {
                                 setS(() => italic = v);
@@ -4956,7 +4951,7 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
                               },
                             ),
                             SwitchListTile(
-                              title: const Text('Underline'),
+                              title: Text(tr('Underline')),
                               value: underline,
                               onChanged: (v) {
                                 setS(() => underline = v);
@@ -4965,7 +4960,7 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
                             ),
                             ListTile(
                               leading: const Icon(Icons.format_clear),
-                              title: const Text('Clear format on selection'),
+                              title: Text(tr('Clear format on selection')),
                               onTap: () {
                                 Navigator.pop(context);
                                 _clearSelectionFormat();
@@ -5030,7 +5025,7 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
                         padding: EdgeInsets.zero,
                       ),
                       Text(
-                        'Rəng',
+                        tr('Rəng'),
                         style: GoogleFonts.dmSans(
                           fontSize: 16,
                           fontWeight: FontWeight.w600,

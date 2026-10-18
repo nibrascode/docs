@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../core/page_size.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../../l10n/ui_strings.dart';
 
 class DocumentSettings {
   String language;
@@ -245,7 +246,7 @@ class _DocSettingsBodyState extends State<_DocSettingsBody> {
                               ),
                               const SizedBox(height: 4),
                               Text(
-                                'Nümunə seç, ${s.pageSize.label} ölçüdə dəyiş',
+                                trf('Nümunə seç, {size} ölçüdə dəyiş', {'size': s.pageSize.label}),
                                 style: GoogleFonts.dmSans(
                                   color: Colors.white70,
                                   fontSize: 12,
@@ -259,7 +260,7 @@ class _DocSettingsBodyState extends State<_DocSettingsBody> {
                     ),
                   ),
                 ),
-                _label('Ölçü'),
+                _label(tr('Ölçü')),
                 Wrap(
                   spacing: 8,
                   children: [
@@ -272,19 +273,19 @@ class _DocSettingsBodyState extends State<_DocSettingsBody> {
                   ],
                 ),
                 SwitchListTile(
-                  title: const Text('Albom (yan)',
+                  title: Text(tr('Albom (yan)'),
                       style: TextStyle(color: Colors.white)),
                   value: s.landscape,
                   onChanged: (v) => setState(() => s.landscape = v),
                 ),
-                _label('Kənar'),
+                _label(tr('Kənar')),
                 Wrap(
                   spacing: 8,
                   children: [
                     for (final m in [
-                      (12.0, 'Dar'),
-                      (20.0, 'Normal'),
-                      (30.0, 'Geniş'),
+                      (12.0, tr('Dar')),
+                      (20.0, tr('Normal')),
+                      (30.0, tr('Geniş')),
                     ])
                       ChoiceChip(
                         label: Text(m.$2),
@@ -293,10 +294,10 @@ class _DocSettingsBodyState extends State<_DocSettingsBody> {
                       ),
                   ],
                 ),
-                _label('Səhifə nömrəsi'),
+                _label(tr('Səhifə nömrəsi')),
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
-                  title: const Text('Göstər',
+                  title: Text(tr('Göstər'),
                       style: TextStyle(color: Colors.white)),
                   value: s.showPageNumbers,
                   onChanged: (v) => setState(() => s.showPageNumbers = v),
@@ -305,12 +306,12 @@ class _DocSettingsBodyState extends State<_DocSettingsBody> {
                   spacing: 8,
                   children: [
                     for (final e in [
-                      ('bottom-center', 'Alt orta'),
-                      ('bottom-right', 'Alt sağ'),
-                      ('bottom-left', 'Alt sol'),
-                      ('top-center', 'Üst orta'),
-                      ('top-right', 'Üst sağ'),
-                      ('top-left', 'Üst sol'),
+                      ('bottom-center', tr('Alt orta')),
+                      ('bottom-right', tr('Alt sağ')),
+                      ('bottom-left', tr('Alt sol')),
+                      ('top-center', tr('Üst orta')),
+                      ('top-right', tr('Üst sağ')),
+                      ('top-left', tr('Üst sol')),
                     ])
                       ChoiceChip(
                         label: Text(e.$2),
@@ -341,41 +342,41 @@ class _DocSettingsBodyState extends State<_DocSettingsBody> {
                 ),
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
-                  title: const Text('Kitab çərçivəsi',
+                  title: Text(tr('Kitab çərçivəsi'),
                       style: TextStyle(color: Colors.white)),
-                  subtitle: const Text('İki xəttli səhifə çərçivəsi',
+                  subtitle: Text(tr('İki xəttli səhifə çərçivəsi'),
                       style: TextStyle(color: Colors.white54, fontSize: 12)),
                   value: s.pageFrame,
                   onChanged: (v) => setState(() => s.pageFrame = v),
                 ),
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
-                  title: const Text('Kitab başlığı',
+                  title: Text(tr('Kitab başlığı'),
                       style: TextStyle(color: Colors.white)),
-                  subtitle: const Text('Nömrə ovalda, altı iki xətt',
+                  subtitle: Text(tr('Nömrə ovalda, altı iki xətt'),
                       style: TextStyle(color: Colors.white54, fontSize: 12)),
                   value: s.bookHeader,
                   onChanged: (v) => setState(() => s.bookHeader = v),
                 ),
                 _stepper(
-                  'Hansı səhifədən',
+                  tr('Hansı səhifədən'),
                   s.pageNumberStartPage,
                   1,
                   30,
                   (v) => setState(() => s.pageNumberStartPage = v),
                 ),
                 _stepper(
-                  'İlk rəqəm',
+                  tr('İlk rəqəm'),
                   s.pageNumberStartAt,
                   1,
                   99,
                   (v) => setState(() => s.pageNumberStartAt = v),
                 ),
                 Text(
-                  'Səhifə ${s.pageNumberStartPage}-də ${s.pageNumberStartAt}, sonra ${s.pageNumberStartAt + 1}, ${s.pageNumberStartAt + 2}…',
+                  trf('Səhifə {p}-də {a}, sonra {b}, {c}…', {'p': s.pageNumberStartPage, 'a': s.pageNumberStartAt, 'b': s.pageNumberStartAt + 1, 'c': s.pageNumberStartAt + 2}),
                   style: const TextStyle(color: Colors.white54, fontSize: 12),
                 ),
-                _label('Yazı'),
+                _label(tr('Yazı')),
                 DropdownButton<String>(
                   value: [
                     'Georgia',
@@ -406,7 +407,7 @@ class _DocSettingsBodyState extends State<_DocSettingsBody> {
                     if (v != null) setState(() => s.fontFamily = v);
                   },
                 ),
-                _label('Ölçü: ${s.fontSize.round()}'),
+                _label(trf('Ölçü: {n}', {'n': s.fontSize.round()})),
                 Slider(
                   value: s.fontSize,
                   min: 10,
@@ -414,7 +415,7 @@ class _DocSettingsBodyState extends State<_DocSettingsBody> {
                   divisions: 26,
                   onChanged: (v) => setState(() => s.fontSize = v),
                 ),
-                _label('Sətir aralığı: ${s.lineHeight.toStringAsFixed(1)}'),
+                _label(trf('Sətir aralığı: {n}', {'n': s.lineHeight.toStringAsFixed(1)})),
                 Slider(
                   value: s.lineHeight,
                   min: 1.0,
@@ -423,7 +424,7 @@ class _DocSettingsBodyState extends State<_DocSettingsBody> {
                   onChanged: (v) => setState(() => s.lineHeight = v),
                 ),
                 SwitchListTile(
-                  title: const Text('Abzas girintisi',
+                  title: Text(tr('Abzas girintisi'),
                       style: TextStyle(color: Colors.white)),
                   value: s.firstLineIndent,
                   onChanged: (v) => setState(() => s.firstLineIndent = v),
@@ -433,32 +434,32 @@ class _DocSettingsBodyState extends State<_DocSettingsBody> {
                 TextField(
                   controller: _author,
                   style: const TextStyle(color: Colors.white),
-                  decoration: const InputDecoration(
-                    labelText: 'Müəllif',
+                  decoration: InputDecoration(
+                    labelText: tr('Müəllif'),
                     labelStyle: TextStyle(color: Colors.white54),
                   ),
                 ),
                 TextField(
                   controller: _subtitle,
                   style: const TextStyle(color: Colors.white),
-                  decoration: const InputDecoration(
-                    labelText: 'Alt başlıq',
+                  decoration: InputDecoration(
+                    labelText: tr('Alt başlıq'),
                     labelStyle: TextStyle(color: Colors.white54),
                   ),
                 ),
                 const SizedBox(height: 6),
-                const Text(
-                  'Yazı yerində «Üz qabığı» düyməsi ana səhifə yaradır.',
+                Text(
+                  tr('Yazı yerində «Üz qabığı» düyməsi ana səhifə yaradır.'),
                   style: TextStyle(color: Colors.white54, fontSize: 12),
                 ),
                 SwitchListTile(
-                  title: const Text('Fəsil yeni səhifədən',
+                  title: Text(tr('Fəsil yeni səhifədən'),
                       style: TextStyle(color: Colors.white)),
                   value: s.chapterNewPage,
                   onChanged: (v) => setState(() => s.chapterNewPage = v),
                 ),
                 ExpansionTile(
-                  title: const Text('Daha çox',
+                  title: Text(tr('Daha çox'),
                       style: TextStyle(color: Colors.white70)),
                   collapsedIconColor: Colors.white54,
                   iconColor: Colors.white70,
@@ -466,24 +467,24 @@ class _DocSettingsBodyState extends State<_DocSettingsBody> {
                     TextField(
                       controller: _genre,
                       style: const TextStyle(color: Colors.white),
-                      decoration: const InputDecoration(
-                        labelText: 'Janr',
+                      decoration: InputDecoration(
+                        labelText: tr('Janr'),
                         labelStyle: TextStyle(color: Colors.white54),
                       ),
                     ),
                     TextField(
                       controller: _series,
                       style: const TextStyle(color: Colors.white),
-                      decoration: const InputDecoration(
-                        labelText: 'Seriya',
+                      decoration: InputDecoration(
+                        labelText: tr('Seriya'),
                         labelStyle: TextStyle(color: Colors.white54),
                       ),
                     ),
                     TextField(
                       controller: _publisher,
                       style: const TextStyle(color: Colors.white),
-                      decoration: const InputDecoration(
-                        labelText: 'Nəşriyyat',
+                      decoration: InputDecoration(
+                        labelText: tr('Nəşriyyat'),
                         labelStyle: TextStyle(color: Colors.white54),
                       ),
                     ),
@@ -498,21 +499,21 @@ class _DocSettingsBodyState extends State<_DocSettingsBody> {
                     TextField(
                       controller: _header,
                       style: const TextStyle(color: Colors.white),
-                      decoration: const InputDecoration(
-                        labelText: 'Üst qeyd',
+                      decoration: InputDecoration(
+                        labelText: tr('Üst qeyd'),
                         labelStyle: TextStyle(color: Colors.white54),
                       ),
                     ),
                     TextField(
                       controller: _footer,
                       style: const TextStyle(color: Colors.white),
-                      decoration: const InputDecoration(
-                        labelText: 'Alt qeyd',
+                      decoration: InputDecoration(
+                        labelText: tr('Alt qeyd'),
                         labelStyle: TextStyle(color: Colors.white54),
                       ),
                     ),
                     SwitchListTile(
-                      title: const Text('Avto-saxla',
+                      title: Text(tr('Avto-saxla'),
                           style: TextStyle(color: Colors.white)),
                       value: s.autoSave,
                       onChanged: (v) => setState(() => s.autoSave = v),

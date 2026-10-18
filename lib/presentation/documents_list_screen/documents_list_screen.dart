@@ -13,6 +13,8 @@ import '../../services/doc_import_service.dart';
 import '../../services/mobile_export_service.dart';
 import '../../l10n/app_localizations.dart';
 import '../../widgets/language_selector_widget.dart';
+import '../../l10n/ui_strings.dart';
+import '../document_editor_screen/doc_title.dart';
 
 class DocumentsListScreen extends StatefulWidget {
   const DocumentsListScreen({super.key});
@@ -200,7 +202,7 @@ class _DocumentsListScreenState extends State<DocumentsListScreen>
       final go = await showDialog<bool>(
         context: context,
         builder: (ctx) => AlertDialog(
-          title: const Text('Document limit'),
+          title: Text(tr('Document limit')),
           content: Text(
             tier == PlanTier.free
                 ? 'Free plan includes up to ${PremiumService.maxDocsFree} documents. Upgrade to Pro (2.75 USD/mo) for unlimited documents and up to 150 pages each.'
@@ -209,11 +211,11 @@ class _DocumentsListScreenState extends State<DocumentsListScreen>
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Not now'),
+              child: Text(tr('Not now')),
             ),
             FilledButton(
               onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('View plans'),
+              child: Text(tr('View plans')),
             ),
           ],
         ),
@@ -398,7 +400,7 @@ class _DocumentsListScreenState extends State<DocumentsListScreen>
       debugPrint("Error: $e\n$st");
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Paylaşmaq alınmadı. Yenidən cəhd edin.')),
+        SnackBar(content: Text(tr('Paylaşmaq alınmadı. Yenidən cəhd edin.'))),
       );
     }
   }
@@ -1001,7 +1003,7 @@ class _DocumentsListScreenState extends State<DocumentsListScreen>
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      doc.title,
+                      DocTitle.display(typed: doc.title, body: doc.content, untitled: l10n.untitledDocument),
                       style: GoogleFonts.dmSans(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
@@ -1156,7 +1158,7 @@ class _DocumentsListScreenState extends State<DocumentsListScreen>
             ),
             const SizedBox(height: 16),
             Text(
-              doc.title,
+              DocTitle.display(typed: doc.title, body: doc.content, untitled: l10n.untitledDocument),
               style: GoogleFonts.dmSans(
                 fontSize: 15,
                 fontWeight: FontWeight.w600,
