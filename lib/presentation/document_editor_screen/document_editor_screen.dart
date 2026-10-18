@@ -2348,6 +2348,85 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
     _toast('Fəsil kursor yerindən bölündü');
   }
 
+  static final _fnDefLineRe = RegExp(r'^\[\^(\d+)\]:[ \t]*(.*)$', multiLine: true);
+
+  /// All footnotes in one sheet: edit text, delete (marker + note). Numbers
+  /// are renumbered 1..n in reading order after any change.
+  Future<void> _showFootnotesEditor() async {
+    _syncCursorFromCanvas();
+    final defs = {for (final m in _fnDefLineRe.allMatches(_bodyCtrl.text)) m.group(1)!: m.group(2)!};
+    if (defs.isEmpty) {
+      _toast(_l('Dipqeyd yoxdur', 'No footnotes yet', 'Сносок нет', 'لا توجد حواش'));
+      return;
+    }
+    final ctrls = {for (final e in defs.entries) e.key: TextEditingController(text: e.value)};
+    final removed = <String>{};
+    final ok = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setS) => Padding(
+          padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+          child: SafeArea(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Text(_l('Dipqeydlər', 'Footnotes', 'Сноски', 'الحواشي'),
+                      style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+                ),
+                Flexible(
+                  child: ListView(
+                    shrinkWrap: true,
+                    children: [
+                      for (final n in ctrls.keys)
+                        if (!removed.contains(n))
+                          ListTile(
+                            key: ValueKey('fn-edit-$n'),
+                            leading: Text('$n', style: const TextStyle(fontWeight: FontWeight.w700)),
+                            title: TextField(controller: ctrls[n], maxLines: null),
+                            trailing: IconButton(
+                              icon: const Icon(Icons.delete_outline),
+                              onPressed: () => setS(() => removed.add(n)),
+                            ),
+                          ),
+                    ],
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: FilledButton(
+                    key: const ValueKey('fn-save'),
+                    onPressed: () => Navigator.pop(ctx, true),
+                    child: Text(_l('Yadda saxla', 'Save', 'Сохранить', 'حفظ')),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    if (ok != true) return;
+    var text = _bodyCtrl.text;
+    text = text.replaceAllMapped(_fnDefLineRe, (m) {
+      final n = m.group(1)!;
+      if (removed.contains(n)) return '\u0000';
+      return '[^$n]: ${ctrls[n]!.text.trim().replaceAll('\n', ' ')}';
+    });
+    text = text.replaceAll('\u0000\n', '').replaceAll('\u0000', '');
+    for (final n in removed) {
+      text = text.replaceAll(RegExp('\\[\\^$n\\](?!:)'), '');
+    }
+    text = renumberFootnotes(text);
+    _bodyCtrl.value = TextEditingValue(text: text, selection: TextSelection.collapsed(offset: text.length));
+    setState(() {
+      _hasUnsavedChanges = true;
+      _isSaved = false;
+    });
+  }
+
   Future<void> _insertFootnote() async {
     _syncCursorFromCanvas();
     // Next free number (each note appears twice: marker + definition).
@@ -5135,6 +5214,7 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
               item(Icons.insert_page_break_outlined, l10n.pageBreak, 'pageBreak'),
               item(Icons.horizontal_rule_rounded, l10n.horizontalLine, 'hline'),
               item(Icons.superscript, l10n.t(az: 'Dipqeyd', en: 'Footnote', ru: 'Сноска', ar: 'حاشية سفلية'), 'footnote'),
+              item(Icons.edit_note_rounded, l10n.t(az: 'Dipqeydləri düzəlt', en: 'Edit footnotes', ru: 'Редактировать сноски', ar: 'تحرير الحواشي'), 'footnotesEdit'),
               item(Icons.title_rounded, l10n.t(az: 'Başlıq', en: 'Heading', ru: 'Заголовок', ar: 'عنوان'), 'h1'),
               item(Icons.format_quote_rounded, l10n.t(az: 'Sitat', en: 'Quote', ru: 'Цитата', ar: 'اقتباس'), 'quote'),
             ],
@@ -5347,6 +5427,9 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
       case 'part':
         _insertPart();
         break;
+      case 'footnotesEdit':
+        _showFootnotesEditor();
+        break;
       case 'footnote':
         _insertFootnote();
         break;
@@ -5510,4 +5593,14 @@ class _DashedLinePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_DashedLinePainter oldDelegate) => false;
+}
+
+/// Renumbers markers 1..n in reading order (definitions follow).
+String renumberFootnotes(String text) {
+  final order = <String>[];
+  for (final m in RegExp(r'\[\^(\d+)\](?!:)').allMatches(text)) {
+    if (!order.contains(m.group(1))) order.add(m.group(1)!);
+  }
+  final map = {for (var i = 0; i < order.length; i++) order[i]: '${i + 1}'};
+  return text.replaceAllMapped(RegExp(r'\[\^(\d+)\]'), (m) => '[^${map[m.group(1)] ?? m.group(1)}]');
 }

@@ -76,7 +76,7 @@ class SettingsScreen extends StatelessWidget {
               context,
               icon: Icons.workspace_premium_rounded,
               iconColor: AppTheme.gold,
-              title: t('Premium planlar', 'Premium plans', 'Премиум', 'الخطط المميزة'),
+              title: t('Premium · Tezliklə', 'Premium · Coming soon', 'Премиум · Скоро', 'بريميوم · قريباً'),
               subtitle: t('İndi bütün alətlər pulsuz açıqdır', 'All tools are free for now', 'Сейчас все инструменты бесплатны', 'كل الأدوات مجانية حالياً'),
               onTap: () => context.push(AppRoutes.subscriptionPlanScreen),
             ),
