@@ -1370,6 +1370,24 @@ class _CoverGalleryBodyState extends State<_CoverGalleryBody> {
   late bool _landscape;
   late CoverData _data;
   String? _editingId;
+  String _cat = 'all';
+  String _query = '';
+
+  /// Category of a template: art covers carry one, code-drawn ones are 'basic'.
+  static String _catOf(CoverTemplate t) => artCoverFor(t.id)?.category ?? 'basic';
+
+  List<CoverTemplate> get _visible {
+    final q = _query.trim().toLowerCase();
+    return [
+      for (final t in coverTemplates)
+        if ((_cat == 'all' || _catOf(t) == _cat) &&
+            (q.isEmpty ||
+                t.name.toLowerCase().contains(q) ||
+                tr(t.name).toLowerCase().contains(q) ||
+                (coverCategoryById(_catOf(t))?.matches(q) ?? basicCoverTags.contains(q))))
+          t
+    ];
+  }
 
   @override
   void initState() {
@@ -1456,13 +1474,59 @@ class _CoverGalleryBodyState extends State<_CoverGalleryBody> {
               ],
             ),
           ),
+          const SizedBox(height: 8),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: TextField(
+              key: const ValueKey('cover-search'),
+              onChanged: (v) => setState(() => _query = v),
+              style: _sans(color: Colors.white, fontSize: 14),
+              decoration: InputDecoration(
+                isDense: true,
+                prefixIcon: const Icon(Icons.search, color: Colors.white54, size: 20),
+                hintText: l10n.t(
+                    az: 'Axtar: dəri, mərmər, naxış…',
+                    en: 'Search: leather, marble, pattern…',
+                    ru: 'Поиск: кожа, мрамор, узор…',
+                    ar: 'ابحث: جلد، رخام، زخرفة…'),
+                hintStyle: _sans(color: Colors.white38, fontSize: 13),
+                filled: true,
+                fillColor: Colors.white.withValues(alpha: 0.06),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            height: 38,
+            child: ListView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              children: [
+                for (final c in <List<String>>[
+                  ['all', l10n.t(az: 'Hamısı', en: 'All', ru: 'Все', ar: 'الكل')],
+                  ['basic', l10n.t(az: 'Sadə', en: 'Simple', ru: 'Простые', ar: 'بسيط')],
+                  for (final k in coverCategories) [k.id, k.label[l10n.language.index]],
+                ])
+                  Padding(
+                    padding: const EdgeInsetsDirectional.only(end: 8),
+                    child: ChoiceChip(
+                      key: ValueKey('cover-cat-${c[0]}'),
+                      label: Text(c[1]),
+                      selected: _cat == c[0],
+                      onSelected: (_) => setState(() => _cat = c[0]),
+                    ),
+                  ),
+              ],
+            ),
+          ),
           const SizedBox(height: 6),
           Text(
             l10n.t(
-              az: '${coverTemplates.length} nümunə · toxun, sonra yazıları dəyiş',
-              en: '${coverTemplates.length} samples · tap, then edit text',
-              ru: '${coverTemplates.length} образцов · нажми, затем правь',
-              ar: '${coverTemplates.length} نماذج · اضغط ثم عدّل النص',
+              az: '${_visible.length} nümunə · toxun, sonra yazıları dəyiş',
+              en: '${_visible.length} samples · tap, then edit text',
+              ru: '${_visible.length} образцов · нажми, затем правь',
+              ar: '${_visible.length} نماذج · اضغط ثم عدّل النص',
             ),
             style: _sans(color: Colors.white54, fontSize: 12),
           ),
@@ -1476,9 +1540,9 @@ class _CoverGalleryBodyState extends State<_CoverGalleryBody> {
                 crossAxisSpacing: 14,
                 childAspectRatio: 0.62,
               ),
-              itemCount: coverTemplates.length,
+              itemCount: _visible.length,
               itemBuilder: (ctx, i) {
-                final t = coverTemplates[i];
+                final t = _visible[i];
                 return LayoutBuilder(
                   builder: (ctx, c) {
                     final w = c.maxWidth;

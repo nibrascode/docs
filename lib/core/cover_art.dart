@@ -16,7 +16,17 @@ class ArtCover {
   final Color bg;
   final Color ink;
   final Color accent;
-  const ArtCover(this.id, this.name, this.style, this.light, this.bg, this.ink, this.accent);
+  final String? _category;
+  const ArtCover(this.id, this.name, this.style, this.light, this.bg, this.ink, this.accent, {String? category})
+      : _category = category;
+
+  /// Browsing category (see [coverCategories]).
+  String get category {
+    if (_category != null) return _category;
+    if (id.startsWith('nibras_ai')) return 'islamic';
+    if (id.contains('leather') || id.contains('suede')) return 'leather';
+    return 'linen';
+  }
 
   String get asset => 'assets/covers/$id.webp';
   String get templateId => 'art_$id';
@@ -203,7 +213,100 @@ const artCovers = <ArtCover>[
   ArtCover('nibras_ai_03', 'Nibras premium naxış №3', 'plaque', false, Color(0xFF29341D), Color(0xFFF3E6C4), Color(0xFFE2BF63)),
   ArtCover('nibras_ai_04', 'Nibras premium naxış №4', 'plaque', false, Color(0xFF232E2D), Color(0xFFF3E6C4), Color(0xFFE2BF63)),
   ArtCover('bordeaux_suede_star', 'Nibras bordo zamşa · ulduz haşiyə', 'border', false, Color(0xFF4B1424), Color(0xFFF3E6C4), Color(0xFFE2BF63)),
+  // Library covers: Nibras cover-gen + covers made by Maher (700px WebP).
+  ArtCover('lib_leather_01', 'Nibras dəri №1', 'plaque', false, Color(0xFF1C211A), Color(0xFFF3E6C4), Color(0xFFE2BF63), category: 'leather'),
+  ArtCover('lib_islamic_01', 'Nibras naxış №1', 'plaque', false, Color(0xFF615B5F), Color(0xFFF3E6C4), Color(0xFFE2BF63), category: 'islamic'),
+  ArtCover('lib_islamic_02', 'Nibras naxış №2', 'plaque', false, Color(0xFF170C04), Color(0xFFF3E6C4), Color(0xFFE2BF63), category: 'islamic'),
+  ArtCover('lib_islamic_03', 'Nibras naxış №3', 'plaque', false, Color(0xFF3D1C13), Color(0xFFF3E6C4), Color(0xFFE2BF63), category: 'islamic'),
+  ArtCover('lib_islamic_04', 'Nibras naxış №4', 'plaque', false, Color(0xFF28354B), Color(0xFFF3E6C4), Color(0xFFE2BF63), category: 'islamic'),
+  ArtCover('lib_leather_02', 'Nibras dəri №2', 'plaque', false, Color(0xFF3D2D1F), Color(0xFFF3E6C4), Color(0xFFE2BF63), category: 'leather'),
+  ArtCover('lib_islamic_05', 'Nibras naxış №5', 'plaque', false, Color(0xFF362923), Color(0xFFF3E6C4), Color(0xFFE2BF63), category: 'islamic'),
+  ArtCover('lib_islamic_06', 'Nibras naxış №6', 'plaque', false, Color(0xFF264E32), Color(0xFFF3E6C4), Color(0xFFE2BF63), category: 'islamic'),
+  ArtCover('lib_leather_03', 'Nibras dəri №3', 'plaque', false, Color(0xFF3A3129), Color(0xFFF3E6C4), Color(0xFFE2BF63), category: 'leather'),
+  ArtCover('lib_islamic_07', 'Nibras naxış №7', 'plaque', false, Color(0xFF2D3C27), Color(0xFFF3E6C4), Color(0xFFE2BF63), category: 'islamic'),
+  ArtCover('lib_islamic_08', 'Nibras naxış №8', 'plaque', false, Color(0xFF383532), Color(0xFFF3E6C4), Color(0xFFE2BF63), category: 'islamic'),
+  ArtCover('lib_islamic_09', 'Nibras naxış №9', 'plaque', false, Color(0xFF1B1711), Color(0xFFF3E6C4), Color(0xFFE2BF63), category: 'islamic'),
+  ArtCover('lib_leather_04', 'Nibras dəri №4', 'plaque', false, Color(0xFF4B130B), Color(0xFFF3E6C4), Color(0xFFE2BF63), category: 'leather'),
+  ArtCover('lib_islamic_10', 'Nibras naxış №10', 'plaque', false, Color(0xFF473A2B), Color(0xFFF3E6C4), Color(0xFFE2BF63), category: 'islamic'),
+  ArtCover('lib_islamic_11', 'Nibras naxış №11', 'plaque', false, Color(0xFF5A4029), Color(0xFFF3E6C4), Color(0xFFE2BF63), category: 'islamic'),
+  ArtCover('lib_islamic_12', 'Nibras naxış №12', 'plaque', false, Color(0xFF4C301A), Color(0xFFF3E6C4), Color(0xFFE2BF63), category: 'islamic'),
+  ArtCover('lib_islamic_13', 'Nibras naxış №13', 'plaque', false, Color(0xFF2D311A), Color(0xFFF3E6C4), Color(0xFFE2BF63), category: 'islamic'),
+  ArtCover('lib_islamic_14', 'Nibras naxış №14', 'plaque', false, Color(0xFF271919), Color(0xFFF3E6C4), Color(0xFFE2BF63), category: 'islamic'),
+  ArtCover('lib_leather_05', 'Nibras dəri №5', 'plaque', false, Color(0xFF4D2210), Color(0xFFF3E6C4), Color(0xFFE2BF63), category: 'leather'),
+  ArtCover('lib_islamic_15', 'Nibras naxış №15', 'plaque', false, Color(0xFF47403B), Color(0xFFF3E6C4), Color(0xFFE2BF63), category: 'islamic'),
+  ArtCover('lib_islamic_16', 'Nibras naxış №16', 'plaque', false, Color(0xFF262728), Color(0xFFF3E6C4), Color(0xFFE2BF63), category: 'islamic'),
+  ArtCover('lib_islamic_17', 'Nibras naxış №17', 'plaque', false, Color(0xFF5A4A38), Color(0xFFF3E6C4), Color(0xFFE2BF63), category: 'islamic'),
+  ArtCover('lib_islamic_18', 'Nibras naxış №18', 'plaque', false, Color(0xFF27271E), Color(0xFFF3E6C4), Color(0xFFE2BF63), category: 'islamic'),
+  ArtCover('lib_islamic_19', 'Nibras naxış №19', 'plaque', false, Color(0xFF201C17), Color(0xFFF3E6C4), Color(0xFFE2BF63), category: 'islamic'),
+  ArtCover('lib_leather_06', 'Nibras dəri №6', 'plaque', false, Color(0xFF3D2009), Color(0xFFF3E6C4), Color(0xFFE2BF63), category: 'leather'),
+  ArtCover('lib_islamic_20', 'Nibras naxış №20', 'plaque', false, Color(0xFF21260F), Color(0xFFF3E6C4), Color(0xFFE2BF63), category: 'islamic'),
+  ArtCover('lib_islamic_21', 'Nibras naxış №21', 'plaque', false, Color(0xFF2A1818), Color(0xFFF3E6C4), Color(0xFFE2BF63), category: 'islamic'),
+  ArtCover('lib_islamic_22', 'Nibras naxış №22', 'plaque', false, Color(0xFF211F1D), Color(0xFFF3E6C4), Color(0xFFE2BF63), category: 'islamic'),
+  ArtCover('lib_leather_07', 'Nibras dəri №7', 'plaque', false, Color(0xFF2E0F04), Color(0xFFF3E6C4), Color(0xFFE2BF63), category: 'leather'),
+  ArtCover('lib_islamic_23', 'Nibras naxış №23', 'plaque', false, Color(0xFF242830), Color(0xFFF3E6C4), Color(0xFFE2BF63), category: 'islamic'),
+  ArtCover('lib_islamic_24', 'Nibras naxış №24', 'plaque', false, Color(0xFF143522), Color(0xFFF3E6C4), Color(0xFFE2BF63), category: 'islamic'),
+  ArtCover('lib_islamic_25', 'Nibras naxış №25', 'plaque', false, Color(0xFF492720), Color(0xFFF3E6C4), Color(0xFFE2BF63), category: 'islamic'),
+  ArtCover('lib_night_01', 'Nibras gecə №1', 'plaque', false, Color(0xFF151513), Color(0xFFF3E6C4), Color(0xFFE2BF63), category: 'night'),
+  ArtCover('lib_leather_08', 'Nibras dəri №8', 'plaque', false, Color(0xFF501E17), Color(0xFFF3E6C4), Color(0xFFE2BF63), category: 'leather'),
+  ArtCover('lib_islamic_26', 'Nibras naxış №26', 'plaque', false, Color(0xFF272916), Color(0xFFF3E6C4), Color(0xFFE2BF63), category: 'islamic'),
+  ArtCover('lib_leather_09', 'Nibras dəri №9', 'plaque', false, Color(0xFF4B0E06), Color(0xFFF3E6C4), Color(0xFFE2BF63), category: 'leather'),
+  ArtCover('lib_leather_10', 'Nibras dəri №10', 'field', false, Color(0xFF05112A), Color(0xFFF3E6C4), Color(0xFFE2BF63), category: 'leather'),
+  ArtCover('lib_marble_01', 'Nibras mərmər №1', 'field', false, Color(0xFF0C0C0C), Color(0xFFF3E6C4), Color(0xFFE2BF63), category: 'marble'),
+  ArtCover('lib_nature_01', 'Nibras təbiət №1', 'field', false, Color(0xFF09281E), Color(0xFFF3E6C4), Color(0xFFE2BF63), category: 'nature'),
+  ArtCover('lib_linen_01', 'Nibras kətan-ipək №1', 'field', true, Color(0xFFE0D7C8), Color(0xFF1A120A), Color(0xFF7A4E22), category: 'linen'),
+  ArtCover('lib_leather_11', 'Nibras dəri №11', 'field', false, Color(0xFF042C33), Color(0xFFF3E6C4), Color(0xFFE2BF63), category: 'leather'),
+  ArtCover('lib_leather_12', 'Nibras dəri №12', 'field', false, Color(0xFF371708), Color(0xFFF3E6C4), Color(0xFFE2BF63), category: 'leather'),
+  ArtCover('lib_marble_02', 'Nibras mərmər №2', 'field', true, Color(0xFFE3E1DD), Color(0xFF1A120A), Color(0xFF7A4E22), category: 'marble'),
+  ArtCover('lib_night_02', 'Nibras gecə №2', 'field', false, Color(0xFF100515), Color(0xFFF3E6C4), Color(0xFFE2BF63), category: 'night'),
+  ArtCover('lib_leather_13', 'Nibras dəri №13', 'field', false, Color(0xFF3C0405), Color(0xFFF3E6C4), Color(0xFFE2BF63), category: 'leather'),
+  ArtCover('lib_night_03', 'Nibras gecə №3', 'field', false, Color(0xFF1D1E21), Color(0xFFF3E6C4), Color(0xFFE2BF63), category: 'night'),
+  ArtCover('lib_linen_02', 'Nibras kətan-ipək №2', 'field', true, Color(0xFFB2A28D), Color(0xFF1A120A), Color(0xFF7A4E22), category: 'linen'),
+  ArtCover('lib_islamic_27', 'Nibras naxış №27', 'field', false, Color(0xFF0A1E3C), Color(0xFFF3E6C4), Color(0xFFE2BF63), category: 'islamic'),
+  ArtCover('lib_islamic_28', 'Nibras naxış №28', 'field', false, Color(0xFF000604), Color(0xFFF3E6C4), Color(0xFFE2BF63), category: 'islamic'),
+  ArtCover('lib_linen_03', 'Nibras kətan-ipək №3', 'field', true, Color(0xFFDDD6CD), Color(0xFF1A120A), Color(0xFF7A4E22), category: 'linen'),
+  ArtCover('lib_night_04', 'Nibras gecə №4', 'plaque', false, Color(0xFF212C46), Color(0xFFF3E6C4), Color(0xFFE2BF63), category: 'night'),
+  ArtCover('lib_nature_02', 'Nibras təbiət №2', 'plaque', true, Color(0xFFD0A67B), Color(0xFF1A120A), Color(0xFF7A4E22), category: 'nature'),
+  ArtCover('lib_nature_03', 'Nibras təbiət №3', 'plaque', true, Color(0xFFB69659), Color(0xFF1A120A), Color(0xFF7A4E22), category: 'nature'),
+  ArtCover('lib_nature_04', 'Nibras təbiət №4', 'plaque', true, Color(0xFF9A9992), Color(0xFF1A120A), Color(0xFF7A4E22), category: 'nature'),
 ];
+
+/// Cover browsing category with labels and search tags in every app language
+/// (az, en, ru, ar).
+class CoverCategory {
+  final String id;
+  final List<String> label; // az, en, ru, ar
+  final String tags;
+  const CoverCategory(this.id, this.label, this.tags);
+  bool matches(String q) {
+    final s = q.trim().toLowerCase();
+    if (s.isEmpty) return true;
+    return '${label.join(' ')} $tags'.toLowerCase().contains(s);
+  }
+}
+
+const coverCategories = <CoverCategory>[
+  CoverCategory('leather', ['Dəri', 'Leather', 'Кожа', 'جلد'],
+      'dəri zamşa klassik leather suede classic кожа замша классика جلد شمواه كلاسيكي'),
+  CoverCategory('islamic', ['İslami naxış', 'Islamic pattern', 'Исламский узор', 'زخرفة إسلامية'],
+      'islami naxış ornament şəmsə həndəsi arabesk islamic pattern geometric arabesque исламский узор орнамент арабеска إسلامي زخرفة هندسي أرابيسك نقش'),
+  CoverCategory('linen', ['Kətan və ipək', 'Linen & silk', 'Лён и шёлк', 'كتان وحرير'],
+      'kətan ipək parça linen silk fabric cloth лён шёлк ткань كتان حرير قماش'),
+  CoverCategory('marble', ['Mərmər', 'Marble', 'Мрамор', 'رخام'], 'mərmər daş marble stone мрамор камень رخام حجر'),
+  CoverCategory('night', ['Gecə və ulduz', 'Night & stars', 'Ночь и звёзды', 'ليل ونجوم'],
+      'gecə ulduz qaranlıq night star dark ночь звезда тёмный ليل نجوم نجمة داكن'),
+  CoverCategory('nature', ['Təbiət', 'Nature', 'Природа', 'طبيعة'],
+      'təbiət mənzərə dəniz meşə dağ nature landscape sea forest mountain природа пейзаж море лес горы طبيعة منظر بحر غابة جبل'),
+];
+
+/// Search tags for the code-drawn ('basic') covers.
+const basicCoverTags = 'sadə simple простой بسيط';
+
+CoverCategory? coverCategoryById(String id) {
+  for (final c in coverCategories) {
+    if (c.id == id) return c;
+  }
+  return null;
+}
 
 ArtCover? artCoverFor(String templateId) {
   if (!templateId.startsWith('art_')) return null;

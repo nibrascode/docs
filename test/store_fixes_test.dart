@@ -97,6 +97,11 @@ void main() {
         if (RegExp(r"\bconst \[[^\]]*$").hasMatch(before) && path.endsWith('book_structure.dart')) continue;
         // cover names are table data shown through tr(name)
         if ((path.endsWith('cover_art.dart') || path.endsWith('book_cover_sheet.dart')) && uiStrings.containsKey(s)) continue;
+        // multilingual category labels / search tags (all 4 languages in one table)
+        if (path.endsWith('cover_art.dart') &&
+            (basicCoverTags == s || coverCategories.any((c) => c.tags == s || c.label.contains(s)))) {
+          continue;
+        }
         bad.add('$path:$line  $s');
       }
       expect(bad, isEmpty, reason: bad.join('\n'));
