@@ -85,6 +85,29 @@ class LocalDocsCache {
     await prefs.setString(_key, jsonEncode(docs));
   }
 
+  /// Re-key a local doc after it was created in the cloud (local_x -> uuid).
+  static Future<void> replaceId(String oldId, String newId) async {
+    final docs = await load();
+    final i = docs.indexWhere((d) => d['id'] == oldId);
+    if (i < 0) return;
+    docs.removeWhere((d) => d['id'] == newId);
+    final j = docs.indexWhere((d) => d['id'] == oldId);
+    docs[j] = {...docs[j], 'id': newId};
+    await _write(docs);
+  }
+
+  /// Insert or overwrite a doc pulled from the cloud, keeping its timestamps.
+  static Future<void> putRaw(Map<String, dynamic> doc) async {
+    final docs = await load();
+    final i = docs.indexWhere((d) => d['id'] == doc['id']);
+    if (i >= 0) {
+      docs[i] = {...docs[i], ...doc};
+    } else {
+      docs.add(doc);
+    }
+    await _write(docs);
+  }
+
   static Future<int> count() async => (await load()).length;
 
   static Future<void> _write(List<Map<String, dynamic>> docs) async {

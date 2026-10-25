@@ -25,14 +25,14 @@ Never commit `.jks` or `key.properties`.
 3. Privacy policy public URL + in-app screen
 4. Content rating, target 13+
 5. Data safety form
-6. Subscriptions: `pro_monthly` ($2.75), `elite_monthly` ($5.75)
+6. Subscriptions (RevenueCat, see GOOGLE_AUTH.md): `nibras_docs_pro_monthly` ($2.75), `nibras_docs_pro_yearly`, `nibras_docs_ultra_monthly` ($5.75), `nibras_docs_ultra_yearly`
 7. Payments profile + bank
 8. Upload AAB → Internal testing → Production
 
 ## D. Store text (EN)
 **Short:** Write books and documents offline. Export PDF and Word.
 
-**Full:** Nibras Docs — mobile writing for books and notes. Offline-first, chapters, TOC, tables, images, PDF/Word/EPUB export, optional cloud sync. Free: 5 docs / 15 pages. Pro and Elite for longer books.
+**Full:** Nibras Docs — mobile writing for books and notes. Offline-first, chapters, TOC, tables, images, PDF/Word/EPUB export, optional Google sign-in with cloud sync. Free: 3 new documents per day, up to 20 pages each. Pro: unlimited writing. Ultra: everything, including premium book covers.
 
 ## E. Contact
 nibrascode@gmail.com

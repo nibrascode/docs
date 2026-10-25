@@ -1419,10 +1419,8 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
       _pageLimitDialogOpen = true;
       final tier = await PremiumService.currentTier();
       final msg = tier == PlanTier.free
-          ? trf('This document is over {max} pages (Free limit). Pro (2.75 USD/mo): up to {pro} pages. Elite (5.75 USD/mo): unlimited length. You can still read and export; upgrade to keep writing longer books.', {'max': PremiumService.maxPagesFree, 'pro': PremiumService.maxPagesPro})
-          : tier == PlanTier.pro
-              ? trf('Pro allows up to {max} pages. Elite (5.75 USD/mo) removes the page limit for long books.', {'max': PremiumService.maxPagesPro})
-              : tr('Page limit reached.');
+          ? trf('This document is over {max} pages (Free limit). Pro and Ultra: unlimited writing. You can still read and export.', {'max': PremiumService.maxPagesFree})
+          : tr('Page limit reached.');
       if (!mounted) {
         _pageLimitDialogOpen = false;
         return;

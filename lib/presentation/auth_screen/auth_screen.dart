@@ -1,4 +1,4 @@
-import '../../services/local_docs_cache.dart';
+import '../../services/cloud_sync.dart';
 import '../../services/supabase_service.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -21,6 +21,7 @@ class _AuthScreenState extends State<AuthScreen> {
   final _passwordCtrl = TextEditingController();
   final _formKey = GlobalKey<FormState>();
   bool _isLogin = true;
+  bool _showEmail = false;
   bool _isLoading = false;
   bool _obscurePassword = true;
   String? _errorMessage;
@@ -52,10 +53,8 @@ class _AuthScreenState extends State<AuthScreen> {
           password: _passwordCtrl.text,
         );
       }
-      // Sync offline docs to cloud
       try {
-        final local = await LocalDocsCache.load();
-        await SupabaseService.instance.syncLocalToCloud(local);
+        await CloudSync.run();
       } catch (_) {}
       if (mounted) {
         context.go(AppRoutes.documentsListScreen);
@@ -64,6 +63,29 @@ class _AuthScreenState extends State<AuthScreen> {
       setState(() => _errorMessage = e.message);
     } catch (e) {
       setState(() => _errorMessage = e.toString());
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _google() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+    try {
+      final res = await SupabaseService.instance.signInWithGoogle();
+      if (res == null) return; // cancelled
+      try {
+        await CloudSync.run();
+      } catch (_) {}
+      if (mounted) context.go(AppRoutes.documentsListScreen);
+    } on StateError {
+      if (mounted) setState(() => _errorMessage = tr('Google sign-in is not configured yet.'));
+    } on AuthException catch (e) {
+      if (mounted) setState(() => _errorMessage = e.message);
+    } catch (e) {
+      if (mounted) setState(() => _errorMessage = e.toString());
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -126,6 +148,40 @@ class _AuthScreenState extends State<AuthScreen> {
                 key: _formKey,
                 child: Column(
                   children: [
+                    SizedBox(
+                      width: double.infinity,
+                      height: 52,
+                      child: ElevatedButton.icon(
+                        key: const Key('google_sign_in_button'),
+                        onPressed: _isLoading ? null : _google,
+                        icon: const Text('G', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: Color(0xFF4285F4))),
+                        label: Text(
+                          tr('Continue with Google'),
+                          style: GoogleFonts.dmSans(fontSize: 15, fontWeight: FontWeight.w600),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.white,
+                          foregroundColor: const Color(0xFF1F1F1F),
+                          side: const BorderSide(color: Color(0xFFDADCE0)),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          elevation: 0,
+                        ),
+                      ),
+                    ),
+                    if (!_showEmail && _errorMessage != null) ...[
+                      const SizedBox(height: 12),
+                      Text(_errorMessage!, textAlign: TextAlign.center, style: GoogleFonts.dmSans(fontSize: 12, color: theme.colorScheme.error)),
+                    ],
+                    const SizedBox(height: 8),
+                    TextButton(
+                      key: const Key('email_toggle'),
+                      onPressed: () => setState(() {
+                        _showEmail = !_showEmail;
+                        _errorMessage = null;
+                      }),
+                      child: Text(tr('Sign in with email instead'), style: GoogleFonts.dmSans(fontSize: 13)),
+                    ),
+                    if (_showEmail) ...[
                     // Email field
                     TextFormField(
                       controller: _emailCtrl,
@@ -271,7 +327,7 @@ class _AuthScreenState extends State<AuthScreen> {
                                 ),
                               )
                             : Text(
-                                _isLogin ? 'Daxil ol' : 'Qeydiyyat',
+                                _isLogin ? tr('Daxil ol') : tr('Qeydiyyat'),
                                 style: GoogleFonts.dmSans(
                                   fontSize: 15,
                                   fontWeight: FontWeight.w600,
@@ -299,7 +355,7 @@ class _AuthScreenState extends State<AuthScreen> {
                             _errorMessage = null;
                           }),
                           child: Text(
-                            _isLogin ? 'Qeydiyyat' : 'Daxil ol',
+                            _isLogin ? tr('Qeydiyyat') : tr('Daxil ol'),
                             style: GoogleFonts.dmSans(
                               fontSize: 13,
                               fontWeight: FontWeight.w600,
@@ -309,6 +365,7 @@ class _AuthScreenState extends State<AuthScreen> {
                         ),
                       ],
                     ),
+                    ],
                     const SizedBox(height: 24),
                     // Divider
                     Row(
@@ -350,7 +407,7 @@ class _AuthScreenState extends State<AuthScreen> {
                           color: theme.colorScheme.onSurfaceVariant,
                         ),
                         label: Text(
-                          tr('Qeydiyyatsız davam et'),
+                          tr('Continue without account'),
                           style: GoogleFonts.dmSans(
                             fontSize: 15,
                             fontWeight: FontWeight.w500,

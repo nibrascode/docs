@@ -8,6 +8,9 @@ import 'package:flutter/material.dart';
 import '../../../core/page_size.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../l10n/ui_strings.dart';
+import '../../../routes/app_routes.dart';
+import '../../../services/premium_service.dart';
+import 'package:go_router/go_router.dart';
 
 TextStyle _serif({
   double? fontSize,
@@ -1372,6 +1375,20 @@ class _CoverGalleryBodyState extends State<_CoverGalleryBody> {
   String? _editingId;
   String _cat = 'all';
   String _query = '';
+  bool _premiumCovers = !PremiumService.billingEnabled;
+
+  bool _locked(CoverTemplate t) =>
+      !_premiumCovers && PremiumService.isPremiumCoverLayout(t.layout);
+
+  void _open(CoverTemplate t) {
+    if (_locked(t)) {
+      ScaffoldMessenger.maybeOf(context)
+          ?.showSnackBar(SnackBar(content: Text(tr('Premium cover — Ultra plan'))));
+      GoRouter.maybeOf(context)?.push(AppRoutes.subscriptionPlanScreen);
+      return;
+    }
+    setState(() => _editingId = t.id);
+  }
 
   /// Category of a template: art covers carry one, code-drawn ones are 'basic'.
   static String _catOf(CoverTemplate t) => artCoverFor(t.id)?.category ?? 'basic';
@@ -1395,6 +1412,9 @@ class _CoverGalleryBodyState extends State<_CoverGalleryBody> {
     _size = widget.pageSize;
     _landscape = widget.landscape;
     _data = widget.initial;
+    PremiumService.canUsePremiumCover().then((v) {
+      if (mounted && v != _premiumCovers) setState(() => _premiumCovers = v);
+    });
   }
 
   double get _pw => _landscape ? _size.heightPx : _size.widthPx;
@@ -1551,15 +1571,27 @@ class _CoverGalleryBodyState extends State<_CoverGalleryBody> {
                       children: [
                         Expanded(
                           child: Center(
-                            child: CoverPagePreview(
-                              template: t,
-                              data: _data.copyWith(templateId: t.id),
-                              width: w,
-                              height: ph > c.maxHeight - 22
-                                  ? c.maxHeight - 22
-                                  : ph,
-                              onTap: () => setState(() => _editingId = t.id),
-                            ),
+                            child: Stack(children: [
+                              CoverPagePreview(
+                                template: t,
+                                data: _data.copyWith(templateId: t.id),
+                                width: w,
+                                height: ph > c.maxHeight - 22
+                                    ? c.maxHeight - 22
+                                    : ph,
+                                onTap: () => _open(t),
+                              ),
+                              if (_locked(t))
+                                const Positioned(
+                                  top: 6,
+                                  right: 6,
+                                  child: CircleAvatar(
+                                    radius: 12,
+                                    backgroundColor: Colors.black54,
+                                    child: Icon(Icons.lock_rounded, size: 14, color: Colors.white),
+                                  ),
+                                ),
+                            ]),
                           ),
                         ),
                         const SizedBox(height: 6),

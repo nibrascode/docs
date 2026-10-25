@@ -1,3 +1,5 @@
+import '../../services/billing_service.dart';
+import '../../l10n/ui_strings.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -61,70 +63,62 @@ class _SubscriptionPlanScreenState extends State<SubscriptionPlanScreen> {
     );
   }
 
-  static final List<PlanModel> _plans = [
+  List<PlanModel> get _plans => [
     PlanModel(
       id: 'free',
-      name: 'Başlanğıc',
-      description:
-          'Sənədlərinizi yazmaq və təşkil etmək üçün lazım olan hər şey.',
-      price: 'Pulsuz',
-      period: 'həmişəlik',
+      name: tr('Free'),
+      description: tr('Start writing — daily limits.'),
+      price: tr('Free'),
+      period: tr('forever'),
       iconEmoji: '📝',
       accentColor: AppTheme.gold,
       bgGradientStart: const Color(0xFF1A2540),
       bgGradientEnd: const Color(0xFF0D1B3E),
-      features: const [
-        PlanFeature(label: 'Up to 5 documents', included: true),
-        PlanFeature(label: 'Up to 15 pages per document', included: true),
-        PlanFeature(label: 'All editing features', included: true),
-        PlanFeature(label: 'PDF / Word / TXT export', included: true),
-        PlanFeature(label: 'Templates', included: true),
-        PlanFeature(label: '150+ page books', included: false),
-        PlanFeature(label: 'Unlimited documents', included: false),
+      features: [
+        PlanFeature(label: tr('3 new documents per day'), included: true),
+        PlanFeature(label: tr('Up to 20 pages per document'), included: true),
+        PlanFeature(label: tr('All editing features'), included: true),
+        PlanFeature(label: tr('PDF / Word / EPUB / TXT export'), included: true),
+        PlanFeature(label: tr('Unlimited documents and pages'), included: false),
+        PlanFeature(label: tr('Premium book covers'), included: false),
       ],
       isPopular: false,
     ),
     PlanModel(
       id: 'pro',
       name: 'Pro',
-      description:
-          'Hər gün yazan frilanser və mütəxəssislər üçün qabaqcıl alətlər.',
+      description: tr('Unlimited writing. Premium covers not included.'),
       price: r'$2.75',
-      period: '/ay',
+      period: tr('/mo'),
       iconEmoji: '⚡',
       accentColor: AppTheme.goldLight,
       bgGradientStart: const Color(0xFF1E2D50),
       bgGradientEnd: const Color(0xFF0D1B3E),
-      features: const [
-        PlanFeature(label: 'Unlimited documents', included: true),
-        PlanFeature(label: 'Up to 150 pages per document', included: true),
-        PlanFeature(label: 'All editing features', included: true),
-        PlanFeature(label: 'PDF / Word / EPUB export', included: true),
-        PlanFeature(label: 'Templates & cloud save', included: true),
-        PlanFeature(label: 'Books over 150 pages', included: false),
-        PlanFeature(label: 'Priority support', included: false),
+      features: [
+        PlanFeature(label: tr('Unlimited documents and pages'), included: true),
+        PlanFeature(label: tr('All editing features'), included: true),
+        PlanFeature(label: tr('PDF / Word / EPUB / TXT export'), included: true),
+        PlanFeature(label: tr('Cloud sync with Google account'), included: true),
+        PlanFeature(label: tr('Premium book covers'), included: false),
       ],
       isPopular: true,
     ),
     PlanModel(
-      id: 'elite',
-      name: 'Elite',
-      description:
-          'Komandalar və güclü istifadəçilər üçün tam Nibras Docs təcrübəsi.',
+      id: 'ultra',
+      name: 'Ultra',
+      description: tr('Everything unlocked, including premium covers.'),
       price: r'$5.75',
-      period: '/ay',
+      period: tr('/mo'),
       iconEmoji: '🚀',
       accentColor: AppTheme.gold,
       bgGradientStart: const Color(0xFF243055),
       bgGradientEnd: const Color(0xFF0D1B3E),
-      features: const [
-        PlanFeature(label: 'Unlimited documents', included: true),
-        PlanFeature(label: 'Unlimited page length', included: true),
-        PlanFeature(label: 'All editing features', included: true),
-        PlanFeature(label: 'PDF / Word / EPUB export', included: true),
-        PlanFeature(label: 'Templates & cloud save', included: true),
-        PlanFeature(label: 'Best for long books', included: true),
-        PlanFeature(label: 'Priority support', included: true),
+      features: [
+        PlanFeature(label: tr('Unlimited documents and pages'), included: true),
+        PlanFeature(label: tr('All editing features'), included: true),
+        PlanFeature(label: tr('PDF / Word / EPUB / TXT export'), included: true),
+        PlanFeature(label: tr('Cloud sync with Google account'), included: true),
+        PlanFeature(label: tr('Premium book covers'), included: true),
       ],
       isPopular: false,
     ),
@@ -154,6 +148,10 @@ class _SubscriptionPlanScreenState extends State<SubscriptionPlanScreen> {
                     color: AppTheme.goldLight,
                   ),
                   const Spacer(),
+                  TextButton(
+                    onPressed: _restore,
+                    child: Text(tr('Restore purchases'), style: TextStyle(color: AppTheme.goldLight)),
+                  ),
                 ],
               ),
             ),
@@ -201,59 +199,57 @@ class _SubscriptionPlanScreenState extends State<SubscriptionPlanScreen> {
     );
   }
 
-  void _onSubscribeTap(PlanModel plan) {
+  Future<void> _onSubscribeTap(PlanModel plan) async {
     if (plan.id == 'free') {
       context.pop();
       return;
     }
-    showDialog(
+    final annual = await showModalBottomSheet<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: AppTheme.surfaceDark,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text(
-          '${plan.name} planına abunə ol',
-          style: const TextStyle(
-            color: Color(0xFFE8EAF6),
-            fontWeight: FontWeight.w700,
+      backgroundColor: AppTheme.surfaceDark,
+      builder: (ctx) => SafeArea(
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          ListTile(
+            title: Text('${plan.name} — ${tr('Monthly')}', style: const TextStyle(color: Colors.white)),
+            onTap: () => Navigator.pop(ctx, false),
           ),
-        ),
-        content: Text(
-          '${plan.name} planına ${plan.price}${plan.period} qiymətinə abunə olmaq üzrəsiniz.\n\nGoogle Play vasitəsilə təhlükəsiz ödəniş.',
-          style: const TextStyle(color: Color(0xFF8899BB)),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text('Ləğv et', style: TextStyle(color: AppTheme.gold)),
+          ListTile(
+            title: Text('${plan.name} — ${tr('Yearly')}', style: const TextStyle(color: Colors.white)),
+            onTap: () => Navigator.pop(ctx, true),
           ),
-          FilledButton(
-            onPressed: () async {
-              Navigator.pop(ctx);
-              await _launchPayment(plan);
-            },
-            style: FilledButton.styleFrom(
-              backgroundColor: AppTheme.gold,
-              foregroundColor: AppTheme.primary,
-            ),
-            child: Text('${plan.name} planını seç'),
-          ),
-        ],
+        ]),
       ),
+    );
+    if (annual == null || !mounted) return;
+    await _launchPayment(plan, annual: annual);
+  }
+
+  void _snack(String msg) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(msg), behavior: SnackBarBehavior.floating),
     );
   }
 
-  Future<void> _launchPayment(PlanModel plan) async {
-    if (plan.id == 'free') return;
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text(
-          'Abunəlik tezliklə RevenueCat ilə qoşulacaq. İndi bütün yazı alətləri açıqdır.',
-        ),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
+  Future<void> _launchPayment(PlanModel plan, {bool annual = false}) async {
+    try {
+      final ok = await BillingService.instance.buy(plan.id, annual: annual);
+      if (ok) {
+        _snack(tr('Subscription active. Thank you!'));
+        if (mounted) context.pop();
+      }
+    } catch (_) {
+      _snack(tr('Purchase failed. Please try again.'));
+    }
+  }
+
+  Future<void> _restore() async {
+    try {
+      final t = await BillingService.instance.restore();
+      _snack(t == PlanTier.free ? tr('No active subscription found.') : tr('Subscription restored.'));
+    } catch (_) {
+      _snack(tr('Purchase failed. Please try again.'));
+    }
   }
 
   /// Premium is not on sale yet: every feature is free. Flip

@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'package:flutter/services.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'billing_service.dart';
 
 class DocumentModel {
   final String id;
@@ -75,43 +77,62 @@ class SupabaseService {
 
   SupabaseService._();
 
+  /// Nibrascode project (Maher). Publishable keys are designed to ship in
+  /// client apps; data is protected by RLS. Override via env.json/dart-define.
+  static const defaultUrl = 'https://qvwqqpxrvnrnwvyckwlo.supabase.co';
+  static const defaultPublishableKey = 'sb_publishable_IsY7gWUlP8l0_QgsQHXZ-w_2lHGEpc2';
+
   static String supabaseUrl = '';
   static String supabaseAnonKey = '';
+  static String googleWebClientId = '';
   static bool _initialized = false;
 
-  /// Load keys from assets/env.json or --dart-define, then init client.
+  /// Pick the client key: publishable first, legacy anon JWT as fallback.
+  static String pickKey(Map<String, dynamic> m) {
+    for (final k in const ['SUPABASE_PUBLISHABLE_KEY', 'SUPABASE_ANON_KEY']) {
+      final v = (m[k] ?? '').toString().trim();
+      if (v.isNotEmpty) return v;
+    }
+    return '';
+  }
+
+  /// Merge config sources: dart-define > env.json > built-in defaults.
+  static Map<String, String> resolveConfig(
+      Map<String, dynamic> defines, Map<String, dynamic> envJson) {
+    String url = (defines['SUPABASE_URL'] ?? '').toString().trim();
+    String key = pickKey(defines);
+    String gid = (defines['GOOGLE_WEB_CLIENT_ID'] ?? '').toString().trim();
+    if (url.isEmpty) url = (envJson['SUPABASE_URL'] ?? '').toString().trim();
+    if (key.isEmpty) key = pickKey(envJson);
+    if (gid.isEmpty) gid = (envJson['GOOGLE_WEB_CLIENT_ID'] ?? '').toString().trim();
+    if (url.isEmpty) url = defaultUrl;
+    if (key.isEmpty) key = defaultPublishableKey;
+    return {'url': url, 'key': key, 'googleWebClientId': gid};
+  }
+
   static Future<void> initialize() async {
     if (_initialized) return;
-    // 1) dart-define
-    const defineUrl = String.fromEnvironment('SUPABASE_URL', defaultValue: '');
-    const defineKey = String.fromEnvironment('SUPABASE_ANON_KEY', defaultValue: '');
-    if (defineUrl.isNotEmpty && defineKey.isNotEmpty) {
-      supabaseUrl = defineUrl;
-      supabaseAnonKey = defineKey;
-    }
-    // 2) asset env.json
-    if (supabaseUrl.isEmpty || supabaseAnonKey.isEmpty) {
-      try {
-        final raw = await rootBundle.loadString('assets/env.json');
-        final map = jsonDecode(raw) as Map<String, dynamic>;
-        supabaseUrl = (map['SUPABASE_URL'] ?? '').toString();
-        supabaseAnonKey = (map['SUPABASE_ANON_KEY'] ?? map['SUPABASE_PUBLISHABLE_KEY'] ?? '').toString();
-      } catch (_) {}
-    }
-    // 3) hardcoded fallback (user project)
-    if (supabaseUrl.isEmpty) {
-      supabaseUrl = 'https://czewxsvfywqwfozrkbjc.supabase.co';
-    }
-    if (supabaseAnonKey.isEmpty) {
-      supabaseAnonKey = 'sb_publishable_TqgEkKDaHAQ7Hb9bcDcfRw_b8jLg5jJ';
-    }
-    if (supabaseUrl.isEmpty || supabaseAnonKey.isEmpty) return;
+    const defines = <String, dynamic>{
+      'SUPABASE_URL': String.fromEnvironment('SUPABASE_URL'),
+      'SUPABASE_PUBLISHABLE_KEY': String.fromEnvironment('SUPABASE_PUBLISHABLE_KEY'),
+      'SUPABASE_ANON_KEY': String.fromEnvironment('SUPABASE_ANON_KEY'),
+      'GOOGLE_WEB_CLIENT_ID': String.fromEnvironment('GOOGLE_WEB_CLIENT_ID'),
+    };
+    Map<String, dynamic> env = {};
     try {
+      env = jsonDecode(await rootBundle.loadString('assets/env.json'))
+          as Map<String, dynamic>;
+    } catch (_) {}
+    final cfg = resolveConfig(defines, env);
+    supabaseUrl = cfg['url']!;
+    supabaseAnonKey = cfg['key']!;
+    googleWebClientId = cfg['googleWebClientId']!;
+    try {
+      // supabase_flutter names the param anonKey; publishable keys work here.
       await Supabase.initialize(url: supabaseUrl, anonKey: supabaseAnonKey);
       _initialized = true;
     } catch (e) {
-      // already initialized
-      _initialized = true;
+      _initialized = true; // already initialized
     }
   }
 
@@ -276,31 +297,35 @@ class SupabaseService {
 
   Future<void> signOut() async {
     if (!isReady) return;
+    try {
+      await GoogleSignIn.instance.signOut();
+    } catch (_) {}
+    await BillingService.instance.logOut();
     await client.auth.signOut();
   }
 
-  /// Push all local docs to cloud for current user (best-effort).
-  Future<int> syncLocalToCloud(List<Map<String, dynamic>> localDocs) async {
-    if (!isReady || !isAuthenticated) return 0;
-    var n = 0;
-    for (final d in localDocs) {
-      try {
-        final id = d['id']?.toString() ?? '';
-        final title = d['title']?.toString() ?? 'Untitled';
-        final content = d['content']?.toString() ?? '';
-        if (id.startsWith('local_')) {
-          await createDocument(title: title, content: content);
-        } else {
-          try {
-            await updateDocument(id: id, title: title, content: content);
-          } catch (_) {
-            await createDocument(title: title, content: content);
-          }
-        }
-        n++;
-      } catch (_) {}
+  /// Google: native account picker → idToken → Supabase session.
+  /// Returns null if the user cancelled. Throws [StateError] if not configured.
+  Future<AuthResponse?> signInWithGoogle() async {
+    if (!isReady) return null;
+    if (googleWebClientId.isEmpty) {
+      throw StateError('GOOGLE_WEB_CLIENT_ID missing');
     }
-    return n;
+    final gsi = GoogleSignIn.instance;
+    await gsi.initialize(serverClientId: googleWebClientId);
+    final GoogleSignInAccount account;
+    try {
+      account = await gsi.authenticate();
+    } on GoogleSignInException catch (e) {
+      if (e.code == GoogleSignInExceptionCode.canceled) return null;
+      rethrow;
+    }
+    final idToken = account.authentication.idToken;
+    if (idToken == null) throw StateError('Google returned no idToken');
+    return client.auth.signInWithIdToken(
+      provider: OAuthProvider.google,
+      idToken: idToken,
+    );
   }
 
   int _countWords(String text) {

@@ -9,6 +9,7 @@ import './l10n/app_localizations.dart';
 import './services/supabase_service.dart';
 import './widgets/custom_error_widget.dart';
 import 'core/app_export.dart';
+import 'services/billing_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -20,6 +21,10 @@ void main() async {
   } catch (e) {
     debugPrint('Failed to initialize Supabase: $e');
   }
+  try {
+    await BillingService.instance
+        .init(appUserId: SupabaseService.instance.currentUser?.id);
+  } catch (_) {}
   try {
     await AppLocalizations().loadSavedLanguage();
   } catch (_) {}

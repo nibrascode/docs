@@ -3,7 +3,7 @@
 
 CREATE TABLE IF NOT EXISTS public.documents (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID NOT NULL REFERENCES public.user_profiles(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
     title TEXT NOT NULL DEFAULT 'Yeni sənəd',
     content TEXT NOT NULL DEFAULT '',
     is_starred BOOLEAN NOT NULL DEFAULT false,

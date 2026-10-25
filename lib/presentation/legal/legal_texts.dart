@@ -2,7 +2,7 @@ import '../../l10n/app_localizations.dart';
 
 /// In-app privacy policy and terms, in every UI language. Keep in step with
 /// what the app really does: offline-first, documents on the device, an
-/// optional account (email) for sign-in, no ads, no analytics, no payments
+/// optional account (Google or email) for sign-in and cloud sync, no ads, no analytics, no payments
 /// while Premium is "coming soon".
 class LegalSection {
   final String title;
@@ -30,9 +30,9 @@ class LegalTexts {
       'Your writing is yours. This policy explains what Nibras Docs stores and why.',
       [
         LegalSection('1. Documents stay on your device',
-            'Documents, images you insert and settings are saved in the app\'s private storage on your device. They are not uploaded anywhere.'),
+            'Documents, images you insert and settings are saved in the app\'s private storage on your device. Without an account they are not uploaded anywhere.'),
         LegalSection('2. Optional account',
-            'You can use the app without an account. If you create one, your email address and a password hash are stored by Supabase to sign you in.'),
+            'You can use the app without an account. If you sign in with Google, Supabase receives your Google account email, name and a sign-in token (we never see your Google password). If you use email sign-in, your email and a password hash are stored by Supabase. Signed-in documents are synced to your private cloud space so you can restore them on another device.'),
         LegalSection('3. Photos and camera',
             'Images are chosen with the Android photo picker, so the app only receives the pictures you select. The camera is used only when you choose to take a photo. The app does not read your photo library.'),
         LegalSection('4. Exports and sharing',
@@ -53,9 +53,9 @@ class LegalTexts {
       'Yazdıqlarınız sizindir. Bu siyasət Nibras Docs-un nəyi və nə üçün saxladığını izah edir.',
       [
         LegalSection('1. Sənədlər cihazınızda qalır',
-            'Sənədlər, əlavə etdiyiniz şəkillər və ayarlar cihazınızda tətbiqin şəxsi yaddaşında saxlanılır. Heç yerə yüklənmir.'),
+            'Sənədlər, əlavə etdiyiniz şəkillər və ayarlar cihazınızda tətbiqin şəxsi yaddaşında saxlanılır. Hesabsız heç yerə yüklənmir.'),
         LegalSection('2. İstəyə bağlı hesab',
-            'Tətbiqdən hesabsız istifadə edə bilərsiniz. Hesab yaratsanız, daxil olmaq üçün e-poçt ünvanınız və şifrənin heşi Supabase-də saxlanılır.'),
+            'Tətbiqdən hesabsız istifadə edə bilərsiniz. Google ilə daxil olsanız, Supabase Google hesabınızın e-poçtunu, adını və giriş tokenini alır (Google şifrənizi heç vaxt görmürük). E-poçt ilə daxil olsanız, e-poçt ünvanınız və şifrənin heşi Supabase-də saxlanılır. Daxil olduqda sənədlər başqa cihazda bərpa üçün şəxsi bulud sahənizə sinxronlaşdırılır.'),
         LegalSection('3. Şəkillər və kamera',
             'Şəkillər Android foto seçicisi ilə seçilir, tətbiq yalnız seçdiyiniz şəkilləri alır. Kamera yalnız siz şəkil çəkmək istəyəndə işləyir. Tətbiq qalereyanızı oxumur.'),
         LegalSection('4. İxrac və paylaşma',
@@ -76,9 +76,9 @@ class LegalTexts {
       'Ваши тексты принадлежат вам. Здесь описано, что хранит Nibras Docs и зачем.',
       [
         LegalSection('1. Документы остаются на устройстве',
-            'Документы, вставленные изображения и настройки хранятся в закрытом хранилище приложения на вашем устройстве и никуда не загружаются.'),
+            'Документы, вставленные изображения и настройки хранятся в закрытом хранилище приложения на вашем устройстве ; без аккаунта они никуда не загружаются.'),
         LegalSection('2. Необязательный аккаунт',
-            'Приложением можно пользоваться без аккаунта. Если вы его создадите, адрес эл. почты и хеш пароля хранятся в Supabase для входа.'),
+            'Приложением можно пользоваться без аккаунта. При входе через Google Supabase получает email, имя и токен входа вашего аккаунта Google (пароль Google мы не видим). При входе по эл. почте в Supabase хранятся адрес и хеш пароля. После входа документы синхронизируются в ваше личное облако для восстановления на другом устройстве.'),
         LegalSection('3. Фото и камера',
             'Изображения выбираются через системный фотовыбор Android, поэтому приложение получает только выбранные вами снимки. Камера включается, только когда вы решите сделать фото. Приложение не читает вашу галерею.'),
         LegalSection('4. Экспорт и отправка',
@@ -99,9 +99,9 @@ class LegalTexts {
       'ما تكتبه ملك لك. توضح هذه السياسة ما يحفظه Nibras Docs ولماذا.',
       [
         LegalSection('1. المستندات تبقى على جهازك',
-            'تُحفظ المستندات والصور التي تدرجها والإعدادات في التخزين الخاص بالتطبيق على جهازك، ولا تُرفع إلى أي مكان.'),
+            'تُحفظ المستندات والصور التي تدرجها والإعدادات في التخزين الخاص بالتطبيق على جهازك، ولا تُرفع إلى أي مكان بدون حساب.'),
         LegalSection('2. حساب اختياري',
-            'يمكنك استخدام التطبيق بدون حساب. إذا أنشأت حساباً، يُحفظ بريدك الإلكتروني وتجزئة كلمة المرور لدى Supabase لتسجيل الدخول.'),
+            'يمكنك استخدام التطبيق بدون حساب. عند تسجيل الدخول عبر Google يتلقى Supabase بريد حسابك واسمك ورمز الدخول (لا نرى كلمة مرور Google أبداً). عند الدخول بالبريد الإلكتروني يُحفظ بريدك وتجزئة كلمة المرور لدى Supabase. بعد تسجيل الدخول تُزامَن المستندات إلى مساحتك السحابية الخاصة لاستعادتها على جهاز آخر.'),
         LegalSection('3. الصور والكاميرا',
             'تُختار الصور عبر منتقي الصور في Android، فلا يتلقى التطبيق إلا الصور التي تختارها. تُستخدم الكاميرا فقط عندما تختار التقاط صورة. لا يقرأ التطبيق معرض صورك.'),
         LegalSection('4. التصدير والمشاركة',

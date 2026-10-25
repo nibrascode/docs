@@ -1,3 +1,4 @@
+import '../../services/cloud_sync.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:go_router/go_router.dart';
@@ -82,6 +83,9 @@ class _DocumentsListScreenState extends State<DocumentsListScreen>
       try {
         if (SupabaseService.instance.isReady &&
             SupabaseService.instance.isAuthenticated) {
+          try {
+            await CloudSync.run();
+          } catch (_) {}
           final remote = await SupabaseService.instance.getDocuments();
           for (final d in remote) {
             final existing = byId[d.id];
@@ -206,8 +210,8 @@ class _DocumentsListScreenState extends State<DocumentsListScreen>
           title: Text(tr('Document limit')),
           content: Text(
             tier == PlanTier.free
-                ? 'Free plan includes up to ${PremiumService.maxDocsFree} documents. Upgrade to Pro (2.75 USD/mo) for unlimited documents and up to 150 pages each.'
-                : 'Upgrade to Elite (5.75 USD/mo) for unlimited page length.',
+                ? trf('Free plan: {max} new documents per day. Pro and Ultra give unlimited writing.', {'max': PremiumService.freeDocsPerDay})
+                : tr('Page limit reached.'),
           ),
           actions: [
             TextButton(
@@ -253,6 +257,7 @@ class _DocumentsListScreenState extends State<DocumentsListScreen>
       ),
     );
     if (!mounted || choice == null) return;
+    await PremiumService.recordDocCreated();
     if (choice == 'template') {
       await context.push(AppRoutes.templatesScreen);
     } else if (choice == 'import') {

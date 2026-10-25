@@ -380,11 +380,11 @@ class AppLocalizations extends ChangeNotifier {
     ru: 'Выбрать Pro план',
     ar: 'اختر خطة Pro',
   );
-  String get selectElite => _t(
-    az: 'Elite Planını Seç',
-    en: 'Choose Elite Plan',
-    ru: 'Выбрать Elite план',
-    ar: 'اختر خطة Elite',
+  String get selectUltra => _t(
+    az: 'Ultra Planını Seç',
+    en: 'Choose Ultra Plan',
+    ru: 'Выбрать план Ultra',
+    ar: 'اختر خطة Ultra',
   );
   String get forever =>
       _t(az: 'həmişəlik', en: 'forever', ru: 'навсегда', ar: 'للأبد');

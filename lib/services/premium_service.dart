@@ -1,106 +1,104 @@
 import 'package:shared_preferences/shared_preferences.dart';
-import 'supabase_service.dart';
+import 'billing_service.dart';
 
-enum PlanTier { free, pro, elite }
+/// Plan model (Maher, Oct 2026):
+/// - Free:  3 new documents per day, 20 pages per document.
+/// - Pro:   unlimited writing; premium book covers stay locked.
+/// - Ultra: everything unlocked (writing + premium covers).
+enum PlanTier { free, pro, ultra }
 
-/// Document/page caps. Billing is off until RevenueCat is connected.
 class PremiumService {
-  static const maxDocsFree = 5;
-  static const maxPagesFree = 15;
-  static const maxPagesPro = 150;
-  static const maxPagesElite = 999999;
+  // Confirmed by Maher: Free = 3 new documents/day, 20 pages per document.
+  static const freeDocsPerDay = 3;
+  static const maxPagesFree = 20; // per document on Free
+  static const unlimited = 999999;
 
-  /// Flip to true after RevenueCat is live.
-  static const billingEnabled = false;
+  /// Back-compat names used by older UI/tests.
+  static const maxDocsFree = freeDocsPerDay;
+  static const maxPagesPro = unlimited;
 
-  static const _prefPlan = 'nibras_plan_tier';
+  /// True only after RevenueCat SDK init succeeded (key present, Android).
+  static bool get billingEnabled => BillingService.instance.available;
 
-  static Future<PlanTier> currentTier() async {
-    if (!billingEnabled) return PlanTier.elite;
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final local = prefs.getString(_prefPlan);
-      if (local == 'elite') return PlanTier.elite;
-      if (local == 'pro') return PlanTier.pro;
+  static const _prefDay = 'nibras_usage_day';
+  static const _prefDocs = 'nibras_usage_docs';
 
-      final svc = SupabaseService.instance;
-      if (svc.isReady && svc.isAuthenticated) {
-        final user = svc.currentUser;
-        if (user != null) {
-          final row = await svc.client
-              .from('profiles')
-              .select('is_premium, premium_until')
-              .eq('id', user.id)
-              .maybeSingle();
-          if (row != null) {
-            final until = row['premium_until'] as String?;
-            if (until != null) {
-              final d = DateTime.tryParse(until);
-              if (d != null && d.isBefore(DateTime.now())) {
-                return PlanTier.free;
-              }
-            }
-            if (row['is_premium'] == true) {
-              return PlanTier.pro;
-            }
-          }
-        }
-      }
-    } catch (_) {}
-    return PlanTier.free;
-  }
-
-  static Future<void> setLocalTier(PlanTier tier) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(
-      _prefPlan,
-      tier == PlanTier.elite
-          ? 'elite'
-          : tier == PlanTier.pro
-              ? 'pro'
-              : 'free',
-    );
-  }
-
-  static Future<bool> isPremium() async {
-    final t = await currentTier();
-    return t != PlanTier.free;
-  }
-
-  static Future<int> maxDocuments() async {
-    final t = await currentTier();
-    if (t == PlanTier.free) return maxDocsFree;
-    return 999999;
-  }
-
-  static Future<int> maxPages() async {
-    final t = await currentTier();
-    switch (t) {
-      case PlanTier.free:
-        return maxPagesFree;
-      case PlanTier.pro:
-        return maxPagesPro;
-      case PlanTier.elite:
-        return maxPagesElite;
+  static PlanTier tierFromString(String? s) {
+    switch (s) {
+      case 'ultra':
+      case 'elite': // legacy
+        return PlanTier.ultra;
+      case 'pro':
+        return PlanTier.pro;
+      default:
+        return PlanTier.free;
     }
   }
 
+  static String tierToString(PlanTier t) => t.name;
+
+  // ── Pure rules (unit-tested) ──
+  static bool writingUnlimited(PlanTier t) => t != PlanTier.free;
+  static bool premiumCoversUnlocked(PlanTier t) => t == PlanTier.ultra;
+  static int docsPerDay(PlanTier t) => t == PlanTier.free ? freeDocsPerDay : unlimited;
+  static int pagesPerDoc(PlanTier t) => t == PlanTier.free ? maxPagesFree : unlimited;
+
+  /// Premium covers = the Nibras art covers (template ids of art covers).
+  static bool isPremiumCoverLayout(String layout) => layout == 'nibrasart';
+
+  static Future<PlanTier> currentTier() async {
+    if (!billingEnabled) return PlanTier.ultra;
+    return BillingService.instance.tier;
+  }
+
+  static Future<bool> isPremium() async => (await currentTier()) != PlanTier.free;
+
+  static Future<int> maxDocuments() async => docsPerDay(await currentTier());
+  static Future<int> maxPages() async => pagesPerDoc(await currentTier());
+
+  // ── Daily usage counters ──
+  static String _today() {
+    final n = DateTime.now();
+    return '${n.year}-${n.month}-${n.day}';
+  }
+
+  static Future<SharedPreferences> _usagePrefs() async {
+    final p = await SharedPreferences.getInstance();
+    if (p.getString(_prefDay) != _today()) {
+      await p.setString(_prefDay, _today());
+      await p.setInt(_prefDocs, 0);
+    }
+    return p;
+  }
+
+  static Future<int> docsCreatedToday() async => (await _usagePrefs()).getInt(_prefDocs) ?? 0;
+
+  static Future<void> recordDocCreated() async {
+    final p = await _usagePrefs();
+    await p.setInt(_prefDocs, (p.getInt(_prefDocs) ?? 0) + 1);
+  }
+
+  /// [currentCount] kept for API compat; Free limit is per day.
   static Future<bool> canCreateDocument(int currentCount) async {
     if (!billingEnabled) return true;
-    final max = await maxDocuments();
-    return currentCount < max;
+    final t = await currentTier();
+    return await docsCreatedToday() < docsPerDay(t);
+  }
+
+  static Future<bool> canUsePremiumCover() async {
+    if (!billingEnabled) return true;
+    return premiumCoversUnlocked(await currentTier());
   }
 
   static Future<bool> canUsePageCount(int pages) async {
     if (!billingEnabled) return true;
-    final max = await maxPages();
-    return pages <= max;
+    return pages <= await maxPages();
   }
 
   static Future<bool> isNearPageLimit(int pages) async {
     if (!billingEnabled) return false;
     final max = await maxPages();
-    if (max >= maxPagesElite) return false;
+    if (max >= unlimited) return false;
     return pages >= (max * 0.8).floor();
   }
 

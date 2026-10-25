@@ -34,4 +34,4 @@ Kompüterdə özünüz: [APK_QUR.md](APK_QUR.md)
 - Hesabsız işləyir (bulud istəyə bağlıdır)
 
 ## Premium
-İndi limit yoxdur. Pro/Elite sonra **RevenueCat** ilə qoşulacaq.
+Planlar: Free (gündə 3 sənəd, 20 səhifə), Pro (limitsiz yazı), Ultra (hər şey + premium üz qabıqları). Ödəniş RevenueCat ilə; quraşdırma: GOOGLE_AUTH.md.
