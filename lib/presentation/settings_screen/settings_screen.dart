@@ -14,6 +14,7 @@ import '../../l10n/ui_strings.dart';
 import '../../core/app_version.dart';
 import '../../services/billing_service.dart';
 import '../../services/premium_service.dart';
+import '../../services/supabase_service.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -115,7 +116,22 @@ class SettingsScreen extends StatelessWidget {
             if (_signedIn()) ...[
               const SizedBox(height: 16),
               _buildSectionTitle(t('Hesab', 'Account', 'Аккаунт', 'الحساب')),
+              _buildInfoTile(t('E-poçt', 'Email', 'Эл. почта', 'البريد'),
+                  Supabase.instance.client.auth.currentUser?.email ?? '-'),
               _buildLogoutTile(context),
+            ] else ...[
+              const SizedBox(height: 16),
+              _buildSectionTitle(t('Hesab', 'Account', 'Аккаунт', 'الحساب')),
+              _buildTile(
+                context,
+                icon: Icons.login_rounded,
+                iconColor: const Color(0xFF60A5FA),
+                title: t('Google ilə daxil ol', 'Sign in with Google', 'Войти через Google', 'تسجيل الدخول عبر Google'),
+                subtitle: t('Premium və sənədlər hesabınızda saxlanılır', 'Keep Premium and documents on your account', 'Premium и документы в вашем аккаунте', 'احفظ Premium والمستندات في حسابك'),
+                onTap: () async {
+                  await context.push(AppRoutes.authScreen);
+                },
+              ),
             ],
             const SizedBox(height: 32),
           ],
@@ -294,7 +310,7 @@ class SettingsScreen extends StatelessWidget {
       child: ListTile(
         onTap: () async {
           try {
-            await Supabase.instance.client.auth.signOut();
+            await SupabaseService.instance.signOut();
           } catch (_) {}
           if (context.mounted) {
             ScaffoldMessenger.of(context).showSnackBar(

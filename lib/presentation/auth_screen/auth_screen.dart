@@ -57,7 +57,7 @@ class _AuthScreenState extends State<AuthScreen> {
         await CloudSync.run();
       } catch (_) {}
       if (mounted) {
-        context.go(AppRoutes.documentsListScreen);
+        _done();
       }
     } on AuthException catch (e) {
       setState(() => _errorMessage = e.message);
@@ -65,6 +65,14 @@ class _AuthScreenState extends State<AuthScreen> {
       setState(() => _errorMessage = e.toString());
     } finally {
       if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  void _done() {
+    if (context.canPop()) {
+      context.pop(true);
+    } else {
+      context.go(AppRoutes.documentsListScreen);
     }
   }
 
@@ -79,7 +87,7 @@ class _AuthScreenState extends State<AuthScreen> {
       try {
         await CloudSync.run();
       } catch (_) {}
-      if (mounted) context.go(AppRoutes.documentsListScreen);
+      if (mounted) _done();
     } on StateError {
       if (mounted) setState(() => _errorMessage = tr('Google sign-in is not configured yet.'));
     } on AuthException catch (e) {

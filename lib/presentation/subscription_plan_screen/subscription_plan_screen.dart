@@ -7,6 +7,8 @@ import './widgets/plan_page_view_widget.dart';
 import './widgets/pricing_header_widget.dart';
 import '../../theme/app_theme.dart';
 import '../../services/premium_service.dart';
+import '../../services/supabase_service.dart';
+import '../../routes/app_routes.dart';
 
 class PlanModel {
   final String id;
@@ -288,8 +290,31 @@ class _SubscriptionPlanScreenState extends State<SubscriptionPlanScreen> {
     );
   }
 
+  /// Premium requires an account so the subscription follows the user
+  /// (RevenueCat appUserID = Supabase user id) across devices.
+  Future<bool> _ensureSignedIn() async {
+    final svc = SupabaseService.instance;
+    if (svc.isReady && svc.isAuthenticated) {
+      await BillingService.instance.logIn(svc.currentUser!.id);
+      return true;
+    }
+    if (!svc.isReady) {
+      _snack(tr('Sign-in is unavailable. Check your internet and try again.'));
+      return false;
+    }
+    _snack(tr('Sign in with Google first so your Premium is saved to your account.'));
+    await context.push(AppRoutes.authScreen);
+    if (!mounted) return false;
+    if (svc.isAuthenticated) {
+      await BillingService.instance.logIn(svc.currentUser!.id);
+      return true;
+    }
+    return false;
+  }
+
   Future<void> _launchPayment(PlanModel plan, {bool annual = false}) async {
     try {
+      if (!await _ensureSignedIn()) return;
       if (!BillingService.instance.available) {
         await BillingService.instance.init();
       }
@@ -323,6 +348,7 @@ class _SubscriptionPlanScreenState extends State<SubscriptionPlanScreen> {
 
   Future<void> _restore() async {
     try {
+      if (!await _ensureSignedIn()) return;
       if (!BillingService.instance.available)
         await BillingService.instance.init();
       if (!BillingService.instance.available) {
