@@ -1419,10 +1419,10 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
       _pageLimitDialogOpen = true;
       final tier = await PremiumService.currentTier();
       final msg = tier == PlanTier.free
-          ? 'This document is over ${PremiumService.maxPagesFree} pages (Free limit). Pro (2.75 USD/mo): up to 150 pages. Elite (5.75 USD/mo): unlimited length. You can still read and export; upgrade to keep writing longer books.'
+          ? trf('This document is over {max} pages (Free limit). Pro (2.75 USD/mo): up to {pro} pages. Elite (5.75 USD/mo): unlimited length. You can still read and export; upgrade to keep writing longer books.', {'max': PremiumService.maxPagesFree, 'pro': PremiumService.maxPagesPro})
           : tier == PlanTier.pro
-              ? 'Pro allows up to ${PremiumService.maxPagesPro} pages. Elite (5.75 USD/mo) removes the page limit for long books.'
-              : 'Page limit reached.';
+              ? trf('Pro allows up to {max} pages. Elite (5.75 USD/mo) removes the page limit for long books.', {'max': PremiumService.maxPagesPro})
+              : tr('Page limit reached.');
       if (!mounted) {
         _pageLimitDialogOpen = false;
         return;
@@ -1435,7 +1435,7 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx),
-              child: const Text('OK'),
+              child: Text(tr('OK')),
             ),
             FilledButton(
               onPressed: () {
@@ -1454,7 +1454,7 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'Approaching page limit ($pages / $maxP). Consider Pro for longer books.',
+            trf('Approaching page limit ({pages} / {max}). Consider Pro for longer books.', {'pages': pages, 'max': maxP}),
             style: GoogleFonts.dmSans(),
           ),
           behavior: SnackBarBehavior.floating,
