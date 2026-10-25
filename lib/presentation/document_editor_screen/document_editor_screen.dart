@@ -1369,6 +1369,16 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
   }
 
 
+  /// The body is edited inside DocumentCanvas (its own focus nodes);
+  /// _bodyFocusNode is not attached to any field, so focus the canvas.
+  void _focusBody() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (_canvasKey.currentState?.focusEditor() != true) _bodyFocusNode.requestFocus();
+    });
+    WidgetsBinding.instance.scheduleFrame();
+  }
+
   void _toggleReadingMode() {
     setState(() {
       _readingMode = !_readingMode;
@@ -4367,7 +4377,7 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
             setState(() => _readingMode = false);
             final o = offset.clamp(0, _bodyCtrl.text.length);
             _bodyCtrl.selection = TextSelection.collapsed(offset: o);
-            _bodyFocusNode.requestFocus();
+            _focusBody();
           },
         ),
       );
@@ -4429,7 +4439,12 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
                         : Alignment.bottomCenter;
               }
 
-              return SizedBox(
+              return GestureDetector(
+                // Taps on empty page space (below/around the text fields)
+                // must open the editor too, not only taps on a text line.
+                behavior: HitTestBehavior.translucent,
+                onTap: _readingMode ? null : _focusBody,
+                child: SizedBox(
                 width: dw,
                 height: sheetH,
                 child: Stack(
@@ -4553,6 +4568,7 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
                     ),
                   ],
                 ),
+              ),
               );
             },
           ),

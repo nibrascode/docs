@@ -600,6 +600,22 @@ class DocumentCanvasState extends State<DocumentCanvas> {
 
   final Map<int, GlobalKey> _blockKeys = {};
   final Map<int, GlobalKey<_ParagraphEditorState>> _paraKeys = {};
+
+  /// Focuses the text editor (last text block, caret at end unless a caret
+  /// already exists) and opens the keyboard. Used for taps on empty page
+  /// space below the text and after leaving reading mode.
+  bool focusEditor() {
+    if (widget.readOnly) return false;
+    final keys = _paraKeys.keys.toList()..sort();
+    for (final k in keys.reversed) {
+      final st = _paraKeys[k]?.currentState;
+      if (st != null && st.mounted) {
+        st.focusLast();
+        return true;
+      }
+    }
+    return false;
+  }
   final GlobalKey _stackKey = GlobalKey();
   List<(double, String)> _breakYs = const [];
   bool _measureQueued = false;
@@ -2047,6 +2063,17 @@ class _ParagraphEditorState extends State<_ParagraphEditor> {
   }
 
   // ------------------------------------------------------------- binding
+
+  void focusLast() {
+    if (_gs.isEmpty) return;
+    final i = _gs.indexWhere((g) => g.f.hasFocus);
+    final gi = i >= 0 ? i : _gs.length - 1;
+    final c = _gs[gi].c;
+    if (!c.selection.isValid) c.selection = TextSelection.collapsed(offset: c.text.length);
+    _gs[gi].f.requestFocus();
+    SystemChannels.textInput.invokeMethod('TextInput.show');
+    _activate(gi);
+  }
 
   void _activate(int i) {
     _focus = i;
