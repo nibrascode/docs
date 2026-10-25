@@ -1423,6 +1423,10 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
           : tier == PlanTier.pro
               ? 'Pro allows up to ${PremiumService.maxPagesPro} pages. Elite (5.75 USD/mo) removes the page limit for long books.'
               : 'Page limit reached.';
+      if (!mounted) {
+        _pageLimitDialogOpen = false;
+        return;
+      }
       await showDialog(
         context: context,
         builder: (ctx) => AlertDialog(
@@ -1603,6 +1607,7 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
     final size = await showTableSizePicker(context);
     if (size == null) return;
     if (size.openCustomEditor) {
+      if (!mounted) return;
       final md = await TableEditorDialog.show(
         context,
         rows: size.rows,
@@ -3116,7 +3121,6 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
     setState(() => _isSaving = true);
 
     try {
-      final l10n = AppLocalizations.of(context);
       final title = _currentTitle();
       final content = _currentContent();
 
@@ -3180,7 +3184,6 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
 
   Future<void> _saveToDatabase() async {
     try {
-      final l10n = AppLocalizations.of(context);
       final title = _currentTitle();
       final content = _currentContent();
       if (_documentId != null) {
@@ -3221,6 +3224,15 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
         );
       } catch (_) {}
     }
+  }
+
+  @visibleForTesting
+  String get bodyMarkupForTest => _bodyCtrl.text;
+
+  @visibleForTesting
+  void runInsertForTest(String key, {TextSelection? selection}) {
+    if (selection != null) _bodyCtrl.selection = selection;
+    _handleInsertKey(key);
   }
 
   @visibleForTesting

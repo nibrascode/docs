@@ -199,6 +199,7 @@ class _DocumentsListScreenState extends State<DocumentsListScreen>
     if (!allowed) {
       if (!mounted) return;
       final tier = await PremiumService.currentTier();
+      if (!mounted) return;
       final go = await showDialog<bool>(
         context: context,
         builder: (ctx) => AlertDialog(
