@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:docspro/l10n/app_localizations.dart';
 import 'package:docspro/presentation/document_editor_screen/document_editor_screen.dart';
 import 'package:docspro/presentation/subscription_plan_screen/subscription_plan_screen.dart';
@@ -18,11 +19,16 @@ void main() {
     expect(renumberFootnotes(t), 'A[^1] B[^2]\n\n[^2]: bir\n[^1]: üç');
   });
 
-  testWidgets('premium screen shows Tezliklə', (t) async {
+  testWidgets('premium screen shows real plans and Play prices, never coming soon', (t) async {
     await t.pumpWidget(LocalizationsProvider(
         child: Sizer(builder: (c, o, s) => const MaterialApp(home: SubscriptionPlanScreen()))));
     await t.pump();
-    expect(find.byKey(const ValueKey('premium-coming-soon')), findsOneWidget);
-    expect(find.textContaining(RegExp('Tezliklə|Coming soon')), findsOneWidget);
+    expect(find.byKey(const ValueKey('premium-coming-soon')), findsNothing);
+    expect(find.textContaining(RegExp('Tezliklə|Coming soon')), findsNothing);
+    final src = File('lib/presentation/subscription_plan_screen/subscription_plan_screen.dart').readAsStringSync();
+    for (final p in [r'$1.99', r'$14.99', r'$3.99', r'$29.99']) {
+      expect(src.contains(p), isTrue, reason: p);
+    }
+    expect(src.contains(r'$2.75') || src.contains(r'$5.75'), isFalse);
   });
 }

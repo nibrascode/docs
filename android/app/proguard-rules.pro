@@ -22,3 +22,19 @@
 -keepattributes *Annotation*,Signature,InnerClasses,EnclosingMethod,Exceptions
 -dontwarn kotlinx.coroutines.**
 -dontwarn com.google.android.play.core.**
+# --- 1.0.3: release-build fixes (R8 stripped classes reached via JNI/reflection) ---
+# package:jni (used by path_provider_android etc.) calls Java/Android classes by name.
+-keep class com.github.dart_lang.jni.** { *; }
+-keep class com.github.dart_lang.jni_flutter.** { *; }
+-keep class androidx.core.content.** { *; }
+-keep class androidx.lifecycle.** { *; }
+# Other plugins
+-keep class com.revenuecat.** { *; }
+-keep class com.android.billingclient.** { *; }
+-keep class com.tekartik.sqflite.** { *; }
+-keep class com.llfbandit.app_links.** { *; }
+-keep class androidx.credentials.** { *; }
+-keep class com.google.android.libraries.identity.googleid.** { *; }
+-keep class com.google.android.gms.auth.** { *; }
+-dontwarn com.revenuecat.**
+-dontwarn androidx.credentials.**

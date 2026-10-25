@@ -21,6 +21,9 @@ String trf(String key, Map<String, Object> args) {
 Set<String> trAll(String key) => {key, ...?uiStrings[key]};
 
 const Map<String, List<String>> uiStrings = {
+  '/yr': ['/il', '/yr', '/год', '/سنة'],
+  'Billing unavailable. Check Google Play and internet, then try again.': ['Ödəniş xidməti əlçatan deyil. Google Play və interneti yoxlayıb yenidən cəhd edin.', 'Billing unavailable. Check Google Play and internet, then try again.', 'Оплата недоступна. Проверьте Google Play и интернет и повторите.', 'الدفع غير متاح. تحقق من Google Play والإنترنت ثم حاول مجددًا.'],
+  'This plan is not available right now. Please try again later.': ['Bu plan hazırda əlçatan deyil. Bir az sonra yenidən cəhd edin.', 'This plan is not available right now. Please try again later.', 'Этот план сейчас недоступен. Попробуйте позже.', 'هذه الخطة غير متاحة الآن. حاول لاحقًا.'],
   'Monthly': ['Aylıq', 'Monthly', 'Ежемесячно', 'شهري'],
   'Yearly': ['İllik', 'Yearly', 'Ежегодно', 'سنوي'],
   'Subscription active. Thank you!': ['Abunəlik aktivdir. Təşəkkürlər!', 'Subscription active. Thank you!', 'Подписка активна. Спасибо!', 'الاشتراك مفعّل. شكرًا!'],

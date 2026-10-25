@@ -35,141 +35,154 @@ class PlanCardWidget extends StatelessWidget {
       ),
       child: Padding(
         padding: const EdgeInsets.fromLTRB(24, 28, 24, 24),
-        child: Column(
-          children: [
-            if (plan.isPopular)
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 4,
-                ),
-                margin: const EdgeInsets.only(bottom: 12),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [AppTheme.gold, AppTheme.goldLight],
-                  ),
-                  borderRadius: BorderRadius.circular(100),
-                ),
-                child: Text(
-                  'Ən Populyar',
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    color: AppTheme.primary,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-            // Icon container
-            Container(
-              width: 72,
-              height: 72,
-              decoration: BoxDecoration(
-                color: plan.accentColor.withAlpha(31),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  color: plan.accentColor.withAlpha(102),
-                  width: 1.5,
-                ),
-              ),
-              child: Center(
-                child: Text(
-                  plan.iconEmoji,
-                  style: const TextStyle(fontSize: 36),
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              plan.name,
-              style: theme.textTheme.headlineMedium?.copyWith(
-                color: plan.accentColor,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              plan.description,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: const Color(0xFF8899BB),
-                height: 1.5,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 16),
-            // Price row with dividers
-            Row(
-              children: [
-                Expanded(
-                  child: Container(
-                    height: 1,
-                    color: plan.accentColor.withAlpha(51),
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 10),
-                  child: Column(
-                    children: [
-                      Text(
-                        plan.price,
-                        style: theme.textTheme.headlineSmall?.copyWith(
-                          color: plan.accentColor,
-                          fontWeight: FontWeight.w700,
-                          fontFeatures: const [FontFeature.tabularFigures()],
+        child: LayoutBuilder(
+          builder: (context, box) => SingleChildScrollView(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minHeight: box.maxHeight),
+              child: IntrinsicHeight(
+                child: Column(
+                  children: [
+                    if (plan.isPopular)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 4,
                         ),
-                      ),
-                      if (plan.period != 'həmişəlik')
-                        Text(
-                          plan.period,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: const Color(0xFF8899BB),
-                            fontSize: 10,
+                        margin: const EdgeInsets.only(bottom: 12),
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [AppTheme.gold, AppTheme.goldLight],
+                          ),
+                          borderRadius: BorderRadius.circular(100),
+                        ),
+                        child: Text(
+                          'Ən Populyar',
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: AppTheme.primary,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
                           ),
                         ),
-                    ],
-                  ),
-                ),
-                Expanded(
-                  child: Container(
-                    height: 1,
-                    color: plan.accentColor.withAlpha(51),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            // Feature list
-            ...plan.features.map(
-              (f) =>
-                  _FeatureRowWidget(feature: f, accentColor: plan.accentColor),
-            ),
-            const Spacer(),
-            const SizedBox(height: 16),
-            // CTA button
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: onSubscribeTap,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: plan.accentColor,
-                  foregroundColor: AppTheme.primary,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(100),
-                  ),
-                  elevation: 0,
-                ),
-                child: Text(
-                  plan.id == 'free'
-                      ? 'Pulsuz Başla'
-                      : '${plan.name} Planını Seç',
-                  style: theme.textTheme.labelLarge?.copyWith(
-                    color: AppTheme.primary,
-                    fontWeight: FontWeight.w700,
-                  ),
+                      ),
+                    // Icon container
+                    Container(
+                      width: 72,
+                      height: 72,
+                      decoration: BoxDecoration(
+                        color: plan.accentColor.withAlpha(31),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: plan.accentColor.withAlpha(102),
+                          width: 1.5,
+                        ),
+                      ),
+                      child: Center(
+                        child: Text(
+                          plan.iconEmoji,
+                          style: const TextStyle(fontSize: 36),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      plan.name,
+                      style: theme.textTheme.headlineMedium?.copyWith(
+                        color: plan.accentColor,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      plan.description,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: const Color(0xFF8899BB),
+                        height: 1.5,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 16),
+                    // Price row with dividers
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Container(
+                            height: 1,
+                            color: plan.accentColor.withAlpha(51),
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 10),
+                          child: Column(
+                            children: [
+                              Text(
+                                plan.price,
+                                style: theme.textTheme.headlineSmall?.copyWith(
+                                  color: plan.accentColor,
+                                  fontWeight: FontWeight.w700,
+                                  fontFeatures: const [
+                                    FontFeature.tabularFigures(),
+                                  ],
+                                ),
+                              ),
+                              if (plan.period != 'həmişəlik')
+                                Text(
+                                  plan.period,
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: const Color(0xFF8899BB),
+                                    fontSize: 10,
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                        Expanded(
+                          child: Container(
+                            height: 1,
+                            color: plan.accentColor.withAlpha(51),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    // Feature list
+                    ...plan.features.map(
+                      (f) => _FeatureRowWidget(
+                        feature: f,
+                        accentColor: plan.accentColor,
+                      ),
+                    ),
+                    const Spacer(),
+                    const SizedBox(height: 16),
+                    // CTA button
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: onSubscribeTap,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: plan.accentColor,
+                          foregroundColor: AppTheme.primary,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(100),
+                          ),
+                          elevation: 0,
+                        ),
+                        child: Text(
+                          plan.id == 'free'
+                              ? 'Pulsuz Başla'
+                              : '${plan.name} Planını Seç',
+                          style: theme.textTheme.labelLarge?.copyWith(
+                            color: AppTheme.primary,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
-          ],
+          ),
         ),
       ),
     );

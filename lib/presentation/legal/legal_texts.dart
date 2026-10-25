@@ -3,7 +3,7 @@ import '../../l10n/app_localizations.dart';
 /// In-app privacy policy and terms, in every UI language. Keep in step with
 /// what the app really does: offline-first, documents on the device, an
 /// optional account (Google or email) for sign-in and cloud sync, no ads, no analytics, no payments
-/// while Premium is "coming soon".
+/// with live Google Play subscriptions.
 class LegalSection {
   final String title;
   final String body;
@@ -129,7 +129,7 @@ class LegalTexts {
         LegalSection('3. Your content', 'Everything you write belongs to you. You are responsible for what you create and share, including respecting other people\'s copyright.'),
         LegalSection('4. Acceptable use', 'Do not use the app to create or spread illegal content, malware or spam, or to infringe the rights of others.'),
         LegalSection('5. Backups', 'Documents are stored on your device. Keep your own backups (Settings → Back up all documents); we cannot recover files lost with a device.'),
-        LegalSection('6. Premium', 'Paid features may be offered later as in-app purchases. Their price and terms will be shown before you pay.'),
+        LegalSection('6. Premium', 'Pro and Ultra are optional auto-renewing subscriptions sold through Google Play (monthly or yearly). The price is shown before you pay. You can cancel any time in Google Play; access stays until the end of the paid period.'),
         LegalSection('7. No warranty', 'The app is provided "as is". To the extent the law allows, we are not liable for lost data or indirect damages.'),
         LegalSection('8. Changes and contact', 'We may update these terms; the current version is always in the app. Questions: nibrascode@gmail.com'),
       ],
@@ -144,7 +144,7 @@ class LegalTexts {
         LegalSection('3. Məzmununuz', 'Yazdığınız hər şey sizindir. Yaratdığınız və paylaşdığınız məzmuna, o cümlədən başqalarının müəllif hüquqlarına hörmətə siz cavabdehsiniz.'),
         LegalSection('4. Qadağalar', 'Tətbiqdən qanunsuz məzmun, zərərli proqram və ya spam yaratmaq, yaymaq və ya başqalarının hüquqlarını pozmaq üçün istifadə etməyin.'),
         LegalSection('5. Ehtiyat nüsxə', 'Sənədlər cihazınızda saxlanılır. Öz ehtiyat nüsxənizi çıxarın (Parametrlər → Ehtiyat nüsxə çıxar); cihazla itən faylları bərpa edə bilmərik.'),
-        LegalSection('6. Premium', 'Ödənişli funksiyalar sonra tətbiqdaxili alış kimi təklif oluna bilər. Qiymət və şərtlər ödənişdən əvvəl göstəriləcək.'),
+        LegalSection('6. Premium', 'Pro və Ultra Google Play vasitəsilə satılan, avtomatik yenilənən istəyə bağlı abunəliklərdir (aylıq və ya illik). Qiymət ödənişdən əvvəl göstərilir. Abunəliyi istənilən vaxt Google Play-də ləğv edə bilərsiniz; ödənilmiş dövrün sonuna qədər giriş qalır.'),
         LegalSection('7. Zəmanət yoxdur', 'Tətbiq «olduğu kimi» təqdim olunur. Qanunun icazə verdiyi qədər, məlumat itkisi və ya dolayı zərər üçün məsuliyyət daşımırıq.'),
         LegalSection('8. Dəyişikliklər və əlaqə', 'Bu şərtlər yenilənə bilər; son versiya həmişə tətbiqdədir. Suallar: nibrascode@gmail.com'),
       ],

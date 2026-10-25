@@ -11,6 +11,9 @@ import '../../services/local_docs_cache.dart';
 import '../../services/mobile_export_service.dart';
 import '../../widgets/language_selector_widget.dart';
 import '../../l10n/ui_strings.dart';
+import '../../core/app_version.dart';
+import '../../services/billing_service.dart';
+import '../../services/premium_service.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -77,8 +80,12 @@ class SettingsScreen extends StatelessWidget {
               context,
               icon: Icons.workspace_premium_rounded,
               iconColor: AppTheme.gold,
-              title: t('Premium · Tezliklə', 'Premium · Coming soon', 'Премиум · Скоро', 'بريميوم · قريباً'),
-              subtitle: t('İndi bütün alətlər pulsuz açıqdır', 'All tools are free for now', 'Сейчас все инструменты бесплатны', 'كل الأدوات مجانية حالياً'),
+              title: !PremiumService.billingEnabled ? 'Premium' : 'Premium · ${{PlanTier.free: t('Pulsuz', 'Free', 'Бесплатно', 'مجاني'), PlanTier.pro: 'Pro', PlanTier.ultra: 'Ultra'}[BillingService.instance.tier]}',
+              subtitle: !PremiumService.billingEnabled
+                  ? t('Ödəniş xidməti əlçatan deyil', 'Billing unavailable', 'Оплата недоступна', 'الدفع غير متاح')
+                  : BillingService.instance.tier == PlanTier.free
+                      ? t('Pro və Ultra planlarına bax', 'See Pro and Ultra plans', 'Планы Pro и Ultra', 'خطط Pro وUltra')
+                      : t('Abunəliyi idarə et', 'Manage subscription', 'Управление подпиской', 'إدارة الاشتراك'),
               onTap: () => context.push(AppRoutes.subscriptionPlanScreen),
             ),
             const SizedBox(height: 16),
@@ -102,7 +109,7 @@ class SettingsScreen extends StatelessWidget {
             const SizedBox(height: 16),
             _buildSectionTitle(t('Tətbiq haqqında', 'About', 'О приложении', 'حول التطبيق')),
             _buildInfoTile(t('Tətbiq adı', 'App name', 'Название', 'الاسم'), 'Nibras Docs'),
-            _buildInfoTile(t('Versiya', 'Version', 'Версия', 'الإصدار'), '1.1.0'),
+            _buildInfoTile(t('Versiya', 'Version', 'Версия', 'الإصدار'), kAppVersion),
             _buildInfoTile(t('Əlaqə', 'Contact', 'Контакт', 'التواصل'), 'nibrascode@gmail.com'),
             _buildInfoTile(t('Sayt', 'Website', 'Сайт', 'الموقع'), 'NibrasCode.com'),
             if (_signedIn()) ...[
