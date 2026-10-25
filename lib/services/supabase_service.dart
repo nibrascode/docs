@@ -77,10 +77,10 @@ class SupabaseService {
 
   SupabaseService._();
 
-  /// Nibrascode project (Maher). Publishable keys are designed to ship in
-  /// client apps; data is protected by RLS. Override via env.json/dart-define.
-  static const defaultUrl = 'https://qvwqqpxrvnrnwvyckwlo.supabase.co';
-  static const defaultPublishableKey = 'sb_publishable_IsY7gWUlP8l0_QgsQHXZ-w_2lHGEpc2';
+  /// Dedicated Nibras Docs project (separate from the nibrascode.com site DB).
+  /// Publishable keys ship in the client; data is protected by RLS.
+  static const defaultUrl = 'https://nocruxpgwldlrsuraavv.supabase.co';
+  static const defaultPublishableKey = 'sb_publishable_z6cR-BVwVROf4ymNR7q52Q_K_TN2LwF';
 
   static String supabaseUrl = '';
   static String supabaseAnonKey = '';

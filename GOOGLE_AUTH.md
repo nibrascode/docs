@@ -1,6 +1,6 @@
 # Google Sign-In + Supabase + RevenueCat setup (Nibras Docs)
 
-App: Android package `com.nibras.docs`. Supabase project **Nibrascode** (`qvwqqpxrvnrnwvyckwlo`).
+App: Android package `com.nibras.docs`. Supabase project **Nibras Docs** (`nocruxpgwldlrsuraavv`) — dedicated, not the site DB.
 
 Flow: native Google account picker (`google_sign_in` 7.x, Credential Manager) → Google **idToken**
 → `supabase.auth.signInWithIdToken(provider: google)` → two-way cloud sync (`CloudSync.run`)
@@ -25,7 +25,7 @@ Flow: native Google account picker (`google_sign_in` 7.x, Credential Manager) �
 ## 3. App config (`assets/env.json`, gitignored — see `env.example.json`)
 ```json
 {
-  "SUPABASE_URL": "https://qvwqqpxrvnrnwvyckwlo.supabase.co",
+  "SUPABASE_URL": "https://nocruxpgwldlrsuraavv.supabase.co",
   "SUPABASE_PUBLISHABLE_KEY": "sb_publishable_...",
   "GOOGLE_WEB_CLIENT_ID": "xxxx.apps.googleusercontent.com",
   "REVENUECAT_GOOGLE_API_KEY": "goog_..."
