@@ -1,4 +1,3 @@
-import 'dart:io';
 
 import 'package:flutter/material.dart';
 import '../../../core/rich_markup.dart';
@@ -1394,12 +1393,6 @@ class _VisualTableState extends State<_VisualTable> {
     );
   }
 
-  void _copyRow() {
-    if (_selR < 0 || _selR >= widget.cells.length) return;
-    Clipboard.setData(
-      ClipboardData(text: widget.cells[_selR].join('\t')),
-    );
-  }
 
   String _txt(int r, int c) =>
       c < widget.cells[r].length ? CellAttr.parse(widget.cells[r][c]).$3 : '';
@@ -1833,35 +1826,6 @@ class _VisualTableState extends State<_VisualTable> {
     );
   }
 
-  Widget _tblBtn(IconData icon, String label, VoidCallback onTap) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        decoration: BoxDecoration(
-          color: const Color(0xFFEEF1F8),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: const Color(0xFFDDE1EE)),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 14, color: const Color(0xFF0D1B3E)),
-            const SizedBox(width: 4),
-            Text(
-              label,
-              style: GoogleFonts.dmSans(
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-                color: const Color(0xFF0D1B3E),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 }
 
 class _G {

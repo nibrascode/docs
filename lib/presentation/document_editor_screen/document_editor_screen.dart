@@ -1627,41 +1627,7 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
     multiLine: true,
   );
 
-  /// Build TOC body from headings (excludes existing TOC titles).
-  String _buildTocBody({int maxLevel = 3}) {
-    final lines = _bodyCtrl.text.split('\n');
-    final buf = StringBuffer();
-    var n = 0;
-    for (final line in lines) {
-      final tline = line.trim();
-      if (tline.toLowerCase().contains('table of contents')) continue;
-      if (tline == '[TOC]' || tline == '[/TOC]') continue;
-      if (tline.startsWith('# ') && !tline.startsWith('## ')) {
-        if (maxLevel >= 1) {
-          n++;
-          buf.writeln('$n. ${tline.substring(2).trim()}');
-        }
-      } else if (tline.startsWith('## ') && !tline.startsWith('### ')) {
-        if (maxLevel >= 2) {
-          buf.writeln('   - ${tline.substring(3).trim()}');
-        }
-      } else if (tline.startsWith('### ') && !tline.startsWith('#### ')) {
-        if (maxLevel >= 3) {
-          buf.writeln('      · ${tline.substring(4).trim()}');
-        }
-      } else if (tline.startsWith('#### ') && maxLevel >= 4) {
-        buf.writeln('         · ${tline.substring(5).trim()}');
-      }
-    }
-    if (n == 0 && buf.isEmpty) {
-      buf.writeln('_No headings yet. Add Heading 1 chapters first._');
-    }
-    return buf.toString().trimRight();
-  }
 
-  String _wrapToc(String body) {
-    return '\n[TOC]\n# Table of Contents\n\n$body\n[/TOC]\n';
-  }
 
   void _insertTableOfContents({int maxLevel = 3, bool ask = true}) {
     _syncCursorFromCanvas();
@@ -4307,33 +4273,6 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
     );
   }
 
-  Widget _iconFmtBtn(
-    IconData icon,
-    String format,
-    bool isActive,
-    ThemeData theme,
-  ) {
-    return GestureDetector(
-      onTap: () => _onFormatTap(format),
-      child: Container(
-        width: 34,
-        height: 32,
-        margin: const EdgeInsets.symmetric(horizontal: 2),
-        decoration: BoxDecoration(
-          color: isActive ? AppTheme.primary.withAlpha(15) : Colors.transparent,
-          borderRadius: BorderRadius.circular(6),
-          border: isActive
-              ? Border.all(color: AppTheme.primary.withAlpha(60))
-              : null,
-        ),
-        child: Icon(
-          icon,
-          size: 18,
-          color: isActive ? AppTheme.primary : theme.colorScheme.onSurface,
-        ),
-      ),
-    );
-  }
 
   IconData _alignIcon(String a) {
     switch (a) {
@@ -5499,108 +5438,9 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
     );
   }
 
-  Widget _colorTab(
-    ThemeData theme,
-    String label,
-    bool isActive,
-    VoidCallback onTap,
-  ) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        decoration: BoxDecoration(
-          color: isActive ? AppTheme.primary : Colors.transparent,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: isActive ? AppTheme.primary : theme.colorScheme.outline,
-          ),
-        ),
-        child: Text(
-          label,
-          style: GoogleFonts.dmSans(
-            fontSize: 13,
-            fontWeight: FontWeight.w500,
-            color: isActive ? Colors.white : theme.colorScheme.onSurfaceVariant,
-          ),
-        ),
-      ),
-    );
-  }
 }
 
-/// A dashed line widget that marks the end of a page
-class _PageBoundaryLine extends StatelessWidget {
-  final PageSize pageSize;
-  final int pageNumber;
-  final int totalPages;
 
-  const _PageBoundaryLine({
-    required this.pageSize,
-    required this.pageNumber,
-    required this.totalPages,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        CustomPaint(
-          size: const Size(double.infinity, 1),
-          painter: _DashedLinePainter(),
-        ),
-        const SizedBox(height: 4),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-              decoration: BoxDecoration(
-                color: const Color(0xFFE53E3E).withAlpha(20),
-                borderRadius: BorderRadius.circular(4),
-                border: Border.all(
-                  color: const Color(0xFFE53E3E).withAlpha(60),
-                ),
-              ),
-              child: Text(
-                '— ${pageSize.label} · $pageNumber / $totalPages —',
-                style: GoogleFonts.dmSans(
-                  fontSize: 9,
-                  color: const Color(0xFFE53E3E),
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 4),
-      ],
-    );
-  }
-}
-
-class _DashedLinePainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = const Color(0xFFE53E3E).withAlpha(180)
-      ..strokeWidth = 1.5
-      ..style = PaintingStyle.stroke;
-
-    const dashWidth = 6.0;
-    const dashSpace = 4.0;
-    double startX = 0;
-
-    while (startX < size.width) {
-      canvas.drawLine(Offset(startX, 0), Offset(startX + dashWidth, 0), paint);
-      startX += dashWidth + dashSpace;
-    }
-  }
-
-  @override
-  bool shouldRepaint(_DashedLinePainter oldDelegate) => false;
-}
 
 /// Renumbers markers 1..n in reading order (definitions follow).
 String renumberFootnotes(String text) {

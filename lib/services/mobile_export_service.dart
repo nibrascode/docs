@@ -3,7 +3,6 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
-import 'package:archive/archive.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/painting.dart';
 import 'package:path_provider/path_provider.dart';
@@ -944,64 +943,6 @@ class MobileExportService {
     await _shareBytes(bytes, _safeFileName(safeTitle, 'epub'), 'application/epub+zip');
   }
 
-  static Uint8List _buildEpub({
-    required String title,
-    required String content,
-  }) {
-    final body = content.split('\n').map((l) {
-      if (l.trim().isEmpty) return '<p><br/></p>';
-      if (l.startsWith('# ')) return '<h1>${_xmlEscape(l.substring(2))}</h1>';
-      if (l.startsWith('## ')) return '<h2>${_xmlEscape(l.substring(3))}</h2>';
-      return '<p>${_xmlEscape(l)}</p>';
-    }).join('\n');
-
-    final id = 'nibras-${DateTime.now().millisecondsSinceEpoch}';
-    final container =
-        '<?xml version="1.0" encoding="UTF-8"?>'
-        '<container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">'
-        '<rootfiles><rootfile full-path="OEBPS/content.opf" '
-        'media-type="application/oebps-package+xml"/></rootfiles></container>';
-    final opf =
-        '<?xml version="1.0" encoding="UTF-8"?>'
-        '<package xmlns="http://www.idpf.org/2007/opf" unique-identifier="BookId" version="2.0">'
-        '<metadata xmlns:dc="http://purl.org/dc/elements/1.1/">'
-        '<dc:title>${_xmlEscape(title)}</dc:title>'
-        '<dc:language>en</dc:language>'
-        '<dc:identifier id="BookId">$id</dc:identifier>'
-        '</metadata>'
-        '<manifest>'
-        '<item id="ncx" href="toc.ncx" media-type="application/x-dtbncx+xml"/>'
-        '<item id="chapter1" href="chapter1.xhtml" media-type="application/xhtml+xml"/>'
-        '</manifest>'
-        '<spine toc="ncx"><itemref idref="chapter1"/></spine>'
-        '</package>';
-    final ncx =
-        '<?xml version="1.0" encoding="UTF-8"?>'
-        '<ncx xmlns="http://www.daisy.org/z3986/2005/ncx/" version="2005-1">'
-        '<head><meta name="dtb:uid" content="$id"/></head>'
-        '<docTitle><text>${_xmlEscape(title)}</text></docTitle>'
-        '<navMap><navPoint id="nav1" playOrder="1">'
-        '<navLabel><text>${_xmlEscape(title)}</text></navLabel>'
-        '<content src="chapter1.xhtml"/></navPoint></navMap></ncx>';
-    final xhtml =
-        '<?xml version="1.0" encoding="UTF-8"?>'
-        '<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml">'
-        '<head><title>${_xmlEscape(title)}</title></head><body>'
-        '<h1>${_xmlEscape(title)}</h1>$body</body></html>';
-
-    final archive = Archive();
-    void addFile(String name, String data) {
-      final encoded = utf8.encode(data);
-      archive.addFile(ArchiveFile(name, encoded.length, encoded));
-    }
-
-    addFile('mimetype', 'application/epub+zip');
-    addFile('META-INF/container.xml', container);
-    addFile('OEBPS/content.opf', opf);
-    addFile('OEBPS/toc.ncx', ncx);
-    addFile('OEBPS/chapter1.xhtml', xhtml);
-    return Uint8List.fromList(ZipEncoder().encode(archive)!);
-  }
 
   static bool _detectRtl(String text) {
     return RegExp(r'[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]').hasMatch(text);
@@ -1032,120 +973,6 @@ class MobileExportService {
     return file.path;
   }
 
-  static Uint8List _buildDocx({
-    required String title,
-    required String content,
-    required String author,
-    required String subtitle,
-  }) {
-    final bodyXml = StringBuffer();
-    bodyXml.writeln(
-      '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',
-    );
-    bodyXml.writeln(
-      '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">',
-    );
-    bodyXml.writeln('<w:body>');
-    void p(String text, {bool bold = false, int size = 24, String align = 'left'}) {
-      final b = bold ? '<w:b/>' : '';
-      final jc = '<w:jc w:val="$align"/>';
-      bodyXml.writeln(
-        '<w:p><w:pPr>$jc</w:pPr><w:r><w:rPr>$b<w:sz w:val="$size"/></w:rPr>'
-        '<w:t xml:space="preserve">${_xmlEscape(text)}</w:t></w:r></w:p>',
-      );
-    }
-
-    p(title, bold: true, size: 44, align: 'center');
-    if (subtitle.isNotEmpty) p(subtitle, size: 28, align: 'center');
-    if (author.isNotEmpty) p(author, size: 24, align: 'center');
-    p('');
-
-    var cursor = 0;
-    void flushText(String raw) {
-      for (final line in raw.split('\n')) {
-        final t = _stripInline(line);
-        final tr = t.trim();
-        if (tr.startsWith('# ') && !tr.startsWith('## ')) {
-          p(tr.substring(2).trim(), bold: true, size: 36);
-        } else if (tr.startsWith('## ')) {
-          p(tr.substring(3).trim(), bold: true, size: 28);
-        } else {
-          p(t);
-        }
-      }
-    }
-
-    for (final m in _blockRe.allMatches(content)) {
-      if (m.start > cursor) flushText(content.substring(cursor, m.start));
-      final s = m.group(0)!;
-      if (s.contains('[TABLE]')) {
-        final tables = TableBlock.allIn(s);
-        if (tables.isNotEmpty) {
-          final tb = tables.first;
-          bodyXml.writeln('<w:tbl><w:tblPr><w:tblW w:w="5000" w:type="pct"/>'
-              '<w:tblBorders>'
-              '<w:top w:val="single" w:sz="8" w:color="0D1B3E"/>'
-              '<w:left w:val="single" w:sz="8" w:color="0D1B3E"/>'
-              '<w:bottom w:val="single" w:sz="8" w:color="0D1B3E"/>'
-              '<w:right w:val="single" w:sz="8" w:color="0D1B3E"/>'
-              '<w:insideH w:val="single" w:sz="4" w:color="DDE1EE"/>'
-              '<w:insideV w:val="single" w:sz="4" w:color="DDE1EE"/>'
-              '</w:tblBorders></w:tblPr>');
-          for (var r = 0; r < tb.cells.length; r++) {
-            bodyXml.writeln('<w:tr>');
-            for (final cell in tb.cells[r]) {
-              final shd = r == 0
-                  ? '<w:shd w:val="clear" w:fill="0D1B3E"/>'
-                  : '';
-              final color = r == 0 ? '<w:color w:val="E8C97A"/>' : '';
-              final b = r == 0 ? '<w:b/>' : '';
-              bodyXml.writeln(
-                '<w:tc><w:tcPr>$shd</w:tcPr><w:p><w:r><w:rPr>$b$color</w:rPr>'
-                '<w:t>${_xmlEscape(cell)}</w:t></w:r></w:p></w:tc>',
-              );
-            }
-            bodyXml.writeln('</w:tr>');
-          }
-          bodyXml.writeln('</w:tbl>');
-          p('');
-        }
-      } else if (s.contains('Page Break')) {
-        bodyXml.writeln('<w:p><w:r><w:br w:type="page"/></w:r></w:p>');
-      } else if (s.contains('* * *')) {
-        p('* * *', align: 'center');
-      } else if (s.startsWith('[img')) {
-        p('[Image]');
-      } else {
-        bodyXml.writeln('<w:p><w:pPr><w:pBdr><w:bottom w:val="single" w:sz="6" w:color="C9A84C"/></w:pBdr></w:pPr></w:p>');
-      }
-      cursor = m.end;
-    }
-    if (cursor < content.length) flushText(content.substring(cursor));
-
-    bodyXml.writeln('<w:sectPr/></w:body></w:document>');
-
-    final contentTypes = '''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
-  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
-  <Default Extension="xml" ContentType="application/xml"/>
-  <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
-</Types>''';
-    final rels = '''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
-</Relationships>''';
-
-    final archive = Archive();
-    void add(String name, String data) {
-      final encoded = utf8.encode(data);
-      archive.addFile(ArchiveFile(name, encoded.length, encoded));
-    }
-
-    add('[Content_Types].xml', contentTypes);
-    add('_rels/.rels', rels);
-    add('word/document.xml', bodyXml.toString());
-    return Uint8List.fromList(ZipEncoder().encode(archive)!);
-  }
 
   static int? _displayPageNo(
     int physical,
@@ -1551,10 +1378,4 @@ class MobileExportService {
     );
   }
 
-  static String _xmlEscape(String s) => s
-      .replaceAll('&', '&amp;')
-      .replaceAll('<', '&lt;')
-      .replaceAll('>', '&gt;')
-      .replaceAll('"', '&quot;')
-      .replaceAll("'", '&apos;');
 }
