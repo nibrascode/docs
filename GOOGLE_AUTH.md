@@ -69,3 +69,5 @@ Also add Play App Signing certificate SHA-1 from Play Console → App integrity 
 
 Web client secret is only on the box at `/home/box/keys/nibras-docs-google-oauth.env` (not in git).
 Use the Web client ID as `GOOGLE_WEB_CLIENT_ID` / `serverClientId`.
+
+| Play App Signing (Play Console) | `45:F2:A3:54:B0:26:99:7A:12:16:79:25:FA:9D:E3:82:4C:73:58:4A` |
