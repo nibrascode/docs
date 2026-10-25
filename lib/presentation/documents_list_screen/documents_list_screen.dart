@@ -245,7 +245,7 @@ class _DocumentsListScreenState extends State<DocumentsListScreen>
           ),
           ListTile(
             leading: const Icon(Icons.upload_file_rounded),
-            title: Text(l10n.t(az: 'Fayldan idxal (.docx, .txt, .md)', en: 'Import file (.docx, .txt, .md)', ru: 'Импорт файла (.docx, .txt, .md)', ar: 'استيراد ملف (.docx, .txt, .md)')),
+            title: Text(l10n.t(az: 'Fayldan idxal (.pdf, .docx, .txt, .md)', en: 'Import file (.pdf, .docx, .txt, .md)', ru: 'Импорт файла (.pdf, .docx, .txt, .md)', ar: 'استيراد ملف (.pdf, .docx, .txt, .md)')),
             onTap: () => Navigator.pop(ctx, 'import'),
           ),
           const SizedBox(height: 8),

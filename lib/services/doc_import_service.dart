@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:archive/archive.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:syncfusion_flutter_pdf/pdf.dart';
 
 import 'local_docs_cache.dart';
 
@@ -12,21 +13,25 @@ class ImportedDoc {
   const ImportedDoc(this.title, this.content);
 }
 
-/// Imports .txt / .md / .docx files as new documents, and restores backups.
+/// Imports .txt / .md / .docx / .pdf files as new documents, and restores backups.
 class DocImportService {
   static Future<ImportedDoc?> pickDocument() async {
     final res = await FilePicker.pickFiles(
       type: FileType.custom,
-      allowedExtensions: ['txt', 'md', 'docx'],
+      allowedExtensions: ['txt', 'md', 'docx', 'pdf'],
       withData: true,
     );
     final f = res?.files.single;
     if (f == null) return null;
     final bytes = f.bytes ?? (f.path != null ? await File(f.path!).readAsBytes() : null);
     if (bytes == null) return null;
-    final name = f.name.replaceAll(RegExp(r'\.(txt|md|docx)$', caseSensitive: false), '');
+    final name = f.name.replaceAll(RegExp(r'\.(txt|md|docx|pdf)$', caseSensitive: false), '');
     final ext = f.extension?.toLowerCase() ?? '';
-    final content = ext == 'docx' ? docxToMarkup(bytes) : utf8.decode(bytes, allowMalformed: true);
+    final content = ext == 'docx'
+        ? docxToMarkup(bytes)
+        : ext == 'pdf'
+            ? pdfToText(bytes)
+            : utf8.decode(bytes, allowMalformed: true);
     return ImportedDoc(name, content.replaceAll('\r\n', '\n'));
   }
 
@@ -43,6 +48,40 @@ class DocImportService {
     final bytes = f.bytes ?? (f.path != null ? await File(f.path!).readAsBytes() : null);
     if (bytes == null) return null;
     return LocalDocsCache.importAll(utf8.decode(bytes));
+  }
+
+  /// Offline PDF text extraction (no layout): one blank line between
+  /// pages, soft line breaks inside a paragraph are joined.
+  static String pdfToText(List<int> bytes) {
+    final doc = PdfDocument(inputBytes: bytes);
+    try {
+      final ex = PdfTextExtractor(doc);
+      final pages = <String>[];
+      for (var i = 0; i < doc.pages.count; i++) {
+        final raw = ex.extractText(startPageIndex: i, endPageIndex: i).replaceAll('\r\n', '\n');
+        final paras = raw
+            .split(RegExp(r'\n\s*\n'))
+            .map(_joinPdfLines)
+            .where((p) => p.isNotEmpty);
+        if (paras.isNotEmpty) pages.add(paras.join('\n\n'));
+      }
+      return pages.join('\n\n');
+    } finally {
+      doc.dispose();
+    }
+  }
+
+  // Joins wrapped lines; a line ending in sentence punctuation ends a paragraph.
+  static String _joinPdfLines(String block) {
+    final out = StringBuffer();
+    for (final l in block.split('\n').map((l) => l.trim()).where((l) => l.isNotEmpty)) {
+      if (out.isNotEmpty) {
+        final prev = out.toString();
+        out.write(RegExp(r'[.!?:…»"”؟]$').hasMatch(prev) ? '\n\n' : ' ');
+      }
+      out.write(l);
+    }
+    return out.toString();
   }
 
   /// Minimal DOCX reader: paragraphs, Heading 1-3, bold/italic/underline
