@@ -190,6 +190,26 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
     _sessionStartWords = existingContent.trim().isEmpty
         ? 0
         : existingContent.trim().split(RegExp(r'\s+')).where((w) => w.isNotEmpty).length;
+    // Home → editor: open the keyboard so the user can type immediately
+    // (tap-to-focus alone is not enough on a blank page after navigation).
+    _scheduleInitialFocus();
+  }
+
+  /// Retry until DocumentCanvas paragraph fields exist, then focus.
+  void _scheduleInitialFocus() {
+    var attempts = 0;
+    void tryFocus() {
+      if (!mounted || _readingMode) return;
+      if (_canvasKey.currentState?.focusEditor() == true) return;
+      if (++attempts > 24) return;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        Future<void>.delayed(const Duration(milliseconds: 16), () {
+          if (mounted) tryFocus();
+        });
+      });
+      WidgetsBinding.instance.scheduleFrame();
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) => tryFocus());
   }
 
   @override

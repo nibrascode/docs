@@ -1,3 +1,4 @@
+import 'dart:async';
 import '../../services/cloud_sync.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -50,11 +51,18 @@ class _DocumentsListScreenState extends State<DocumentsListScreen>
     super.dispose();
   }
 
-  Future<void> _loadDocuments() async {
-    setState(() {
-      _isLoading = true;
-      _error = null;
-    });
+  /// Loads documents. When [silent] is true (or omitted while a list is
+  /// already on screen), the list stays tappable — no full-screen spinner.
+  /// That matters after returning from the editor: a cloud sync that is
+  /// slow or hung must not hide the home list so "open again" fails.
+  Future<void> _loadDocuments({bool? silent}) async {
+    final keepList = silent ?? _docs.isNotEmpty;
+    if (!keepList && mounted) {
+      setState(() {
+        _isLoading = true;
+        _error = null;
+      });
+    }
     try {
       // Part 1: local store is source of truth (always works offline)
       final local = await LocalDocsCache.load();
@@ -79,23 +87,8 @@ class _DocumentsListScreenState extends State<DocumentsListScreen>
           updatedAt: parseDt(m['updatedAt']),
         );
       }
-      // Optional cloud merge when logged in
-      try {
-        if (SupabaseService.instance.isReady &&
-            SupabaseService.instance.isAuthenticated) {
-          try {
-            await CloudSync.run();
-          } catch (_) {}
-          final remote = await SupabaseService.instance.getDocuments();
-          for (final d in remote) {
-            final existing = byId[d.id];
-            if (existing == null || d.updatedAt.isAfter(existing.updatedAt)) {
-              byId[d.id] = d;
-            }
-          }
-        }
-      } catch (_) {}
-      final docs = byId.values.toList()
+      // Show local docs immediately so the list stays openable.
+      var docs = byId.values.toList()
         ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
       if (mounted) {
         setState(() {
@@ -103,6 +96,34 @@ class _DocumentsListScreenState extends State<DocumentsListScreen>
           _isLoading = false;
         });
       }
+      // Optional cloud merge when logged in (timed out so it cannot block reopen)
+      try {
+        if (SupabaseService.instance.isReady &&
+            SupabaseService.instance.isAuthenticated) {
+          try {
+            await CloudSync.run().timeout(const Duration(seconds: 8));
+          } catch (_) {}
+          try {
+            final remote = await SupabaseService.instance
+                .getDocuments()
+                .timeout(const Duration(seconds: 8));
+            for (final d in remote) {
+              final existing = byId[d.id];
+              if (existing == null || d.updatedAt.isAfter(existing.updatedAt)) {
+                byId[d.id] = d;
+              }
+            }
+          } catch (_) {}
+          docs = byId.values.toList()
+            ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+          if (mounted) {
+            setState(() {
+              _docs = docs;
+              _isLoading = false;
+            });
+          }
+        }
+      } catch (_) {}
     } catch (e) {
       if (mounted) {
         setState(() {
@@ -189,7 +210,7 @@ class _DocumentsListScreenState extends State<DocumentsListScreen>
     } catch (_) {}
     if (!mounted) return;
     await context.push(AppRoutes.documentEditorScreen, extra: extra);
-    if (mounted) _loadDocuments();
+    if (mounted) _loadDocuments(silent: true);
   }
 
   Future<void> _createNewDocument() async {
@@ -280,7 +301,7 @@ class _DocumentsListScreenState extends State<DocumentsListScreen>
     } else {
       await context.push(AppRoutes.documentEditorScreen);
     }
-    if (mounted) _loadDocuments();
+    if (mounted) _loadDocuments(silent: true);
   }
 
   Future<void> _renameDocument(DocumentModel doc) async {
@@ -651,7 +672,7 @@ class _DocumentsListScreenState extends State<DocumentsListScreen>
               arrowColor: const Color(0xFF0B1F4A).withAlpha(140),
               onTap: () async {
                 await context.push(AppRoutes.templatesScreen);
-                if (mounted) _loadDocuments();
+                if (mounted) _loadDocuments(silent: true);
               },
             ),
           ),
