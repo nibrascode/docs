@@ -1384,6 +1384,16 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
       _readingMode = !_readingMode;
       if (_readingMode) _focusMode = false;
     });
+    // Back to editing: put the caret in the text and open the keyboard.
+    if (!_readingMode) _focusBody();
+  }
+
+  /// Reading mode → editing at [offset] (a tapped line, or the end).
+  void _leaveReadingAt(int offset) {
+    setState(() => _readingMode = false);
+    final o = offset.clamp(0, _bodyCtrl.text.length);
+    _bodyCtrl.selection = TextSelection.collapsed(offset: o);
+    _focusBody();
   }
 
   void _markDirty() {
@@ -4369,16 +4379,18 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
     if (_readingMode) {
       final doc = _layout;
       if (doc == null) return const Center(child: CircularProgressIndicator());
-      return ColoredBox(
-        color: const Color(0xFFE9E6E0),
-        child: LayoutPagesView(
-          doc: doc,
-          onTapLine: (offset) {
-            setState(() => _readingMode = false);
-            final o = offset.clamp(0, _bodyCtrl.text.length);
-            _bodyCtrl.selection = TextSelection.collapsed(offset: o);
-            _focusBody();
-          },
+      // Any tap in reading mode (a line, blank page space, the gutter
+      // between pages, a cover) goes back to editing.
+      return GestureDetector(
+        key: const ValueKey('reading-mode-tap'),
+        behavior: HitTestBehavior.opaque,
+        onTap: () => _leaveReadingAt(_bodyCtrl.text.length),
+        child: ColoredBox(
+          color: const Color(0xFFE9E6E0),
+          child: LayoutPagesView(
+            doc: doc,
+            onTapLine: _leaveReadingAt,
+          ),
         ),
       );
     }
@@ -4401,9 +4413,23 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
             ? _headerText.trim()
             : _titleCtrl.text.trim();
 
-        return SingleChildScrollView(
+        // Taps anywhere in the writing area that no field/table/image takes
+        // (blank page space, margins, the grey area around and below the
+        // page) open the editor and the keyboard.
+        return GestureDetector(
+          key: const ValueKey('editor-tap-area'),
+          behavior: HitTestBehavior.translucent,
+          onTap: _readingMode ? null : _focusBody,
+          child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 6),
-          child: ValueListenableBuilder<TextEditingValue>(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              minWidth: (constraints.maxWidth - 12).clamp(0, double.infinity),
+              minHeight: (constraints.maxHeight - 24).clamp(0, double.infinity),
+            ),
+            child: Align(
+            alignment: Alignment.topCenter,
+            child: ValueListenableBuilder<TextEditingValue>(
             valueListenable: _bodyCtrl,
             builder: (context, value, child) {
               final plain = _plainForPages(value.text);
@@ -4439,12 +4465,7 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
                         : Alignment.bottomCenter;
               }
 
-              return GestureDetector(
-                // Taps on empty page space (below/around the text fields)
-                // must open the editor too, not only taps on a text line.
-                behavior: HitTestBehavior.translucent,
-                onTap: _readingMode ? null : _focusBody,
-                child: SizedBox(
+              return SizedBox(
                 width: dw,
                 height: sheetH,
                 child: Stack(
@@ -4568,9 +4589,11 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen>
                     ),
                   ],
                 ),
-              ),
               );
             },
+          ),
+          ),
+          ),
           ),
         );
       },

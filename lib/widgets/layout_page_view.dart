@@ -114,6 +114,22 @@ class LayoutPage extends StatelessWidget {
                   return;
                 }
               }
+              // Blank space (margins, below the last line, empty page):
+              // nearest line, so the tap is never lost.
+              if (page.lines.isEmpty) {
+                onTapLine!(1 << 30); // clamped to the end of the text
+                return;
+              }
+              var best = page.lines.first;
+              var bestD = double.infinity;
+              for (final l in page.lines) {
+                final dist = (yPt - (l.top + l.height / 2)).abs();
+                if (dist < bestD) {
+                  bestD = dist;
+                  best = l;
+                }
+              }
+              onTapLine!(best.sourceOffset);
             },
       child: SizedBox(
         width: width,
